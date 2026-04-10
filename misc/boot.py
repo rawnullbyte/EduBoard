@@ -1,22 +1,25 @@
-#!/usr/bin/env python3
 import curses
 import random
 import time
+import math
 
 def main(stdscr):
-    # Setup
     curses.curs_set(0)
     stdscr.nodelay(True)
     curses.start_color()
-    curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)
-    curses.init_pair(2, curses.COLOR_BLUE, curses.COLOR_BLACK)
-    curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_BLACK)
-
+    curses.use_default_colors()
+    
+    try:
+        for i in range(1, 7):
+            curses.init_pair(i, 231 + (i * 4), -1)
+    except:
+        for i in range(1, 7):
+            curses.init_pair(i, curses.COLOR_WHITE, -1)
+    
     h, w = stdscr.getmaxyx()
     particles = []
     chars = ".:*+@"
-
-    # ==================== YOUR TEXT AS SINGLE STRING ====================
+    
     RAW_TEXT = """
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣤⣤⣤⣤⣄⣀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣤⠶⣻⠝⠋⠠⠔⠛⠁⡀⠀⠈⢉⡙⠓⠶⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
@@ -49,75 +52,109 @@ def main(stdscr):
 ⠀⠉⠙⠛⠛⠛⠛⠛⠻⠿⠿⠿⠷⠶⠶⢶⣶⣶⣶⣶⣤⣤⣤⣤⣤⣥⣬⣭⣭⣉⣩⣍⣙⣏⣉⣏⣽⣶⣶⣶⣤⣤⣬⣤⣤⣾⣿⠶⠾⠿⠿⠿⠿⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛⠃
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠉⠉⠉⠉⠉⠛⠛⠛⠛⠛⠛⠋⠉⠉⠉⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ----------------------------------------------------------------
-EduBoard made by NullByte for Foxy
+EduBoard made by NullByte
 ----------------------------------------------------------------
 Contact: me@nullbyte.rip
     """
-    # Split string into a list and remove empty trailing/leading lines if desired
-    TEXT_LINES = [line for line in RAW_TEXT.splitlines() if line.strip()]
-    # ====================================================================
-
+    
+    TEXT_LINES = RAW_TEXT.splitlines()
+    
+    BLANKS = (" ", "⠀")
+    LINE_BOUNDS = []
+    for line in TEXT_LINES:
+        first = -1
+        last = -1
+        for idx, char in enumerate(line):
+            if char not in BLANKS:
+                if first == -1:
+                    first = idx
+                last = idx
+        if first == -1:
+            LINE_BOUNDS.append(None)
+        else:
+            LINE_BOUNDS.append((first, last))
+    
     fps = 30
     start_time = time.time()
-
+    fade_in_duration = 3
+    hold_duration = 4
+    fade_out_duration = 3
+    total_duration = fade_in_duration + hold_duration + fade_out_duration
+    
     while True:
-        elapsed = time.time() - start_time
+        current_time = time.time()
+        elapsed = current_time - start_time
+        if elapsed > total_duration:
+            break
         
-        # 15s Hard Stop
-        if elapsed > 15:
-            break
-
-        key = stdscr.getch()
-        if key in (ord('q'), ord('Q'), 27):
-            break
-
-        # --- Star Logic ---
-        if random.random() < 0.7:
-            for _ in range(3):
-                # x, y, speed, brightness
-                particles.append([random.randint(0, w-1), h-1, random.uniform(0.5, 1.2), random.randint(2, 4)])
-
+        if random.random() < 0.6:
+            for _ in range(2):
+                particles.append([
+                    random.randint(0, w-1),
+                    h-1,
+                    random.uniform(0.3, 0.8),
+                    random.randint(0, 4),
+                    random.uniform(0, 2 * math.pi)
+                ])
+        
+        center_y = (h - len(TEXT_LINES)) // 2
+        
+        if elapsed <= fade_in_duration:
+            # Fade in
+            p = elapsed / fade_in_duration
+            curr_y = h - ((1 - (1 - p)**3) * (h - center_y))
+        elif elapsed <= fade_in_duration + hold_duration:
+            # Hold in center
+            curr_y = center_y
+        else:
+            # Fade out
+            p = (elapsed - fade_in_duration - hold_duration) / fade_out_duration
+            curr_y = center_y - ((p**2) * (center_y + len(TEXT_LINES)))
+        
         stdscr.clear()
-
-        # Update and Draw Stars
+        
+        # DRAW TEXT FIRST
+        for i, line in enumerate(TEXT_LINES):
+            draw_y = int(curr_y) + i
+            if 0 <= draw_y < h:
+                sx = max(0, (w - len(line)) // 2)
+                try:
+                    stdscr.addstr(draw_y, sx, line[:w-sx], curses.color_pair(6) | curses.A_BOLD)
+                except:
+                    pass
+        
+        # 2. DRAW STARS ON TOP
         new_particles = []
         for p in particles:
             p[1] -= p[2]
             if p[1] > 0:
                 y, x = int(p[1]), int(p[0])
-                intensity = int(p[3])
-                color = 3 if intensity > 2 else (2 if intensity > 1 else 1)
-                try:
-                    stdscr.addch(y, x, chars[min(intensity, 4)], curses.color_pair(color))
-                except: pass
+                can_draw_star = True
+                rel_y = y - int(curr_y)
+                
+                # Check if star is in the text area
+                if 0 <= rel_y < len(LINE_BOUNDS):
+                    bounds = LINE_BOUNDS[rel_y]
+                    if bounds:
+                        line = TEXT_LINES[rel_y]
+                        sx = (w - len(line)) // 2
+                        ink_left = sx + bounds[0]
+                        ink_right = sx + bounds[1]
+                        
+                        # Hide stars between first and last non-space character
+                        if ink_left <= x <= ink_right:
+                            can_draw_star = False
+                
+                if can_draw_star and 0 <= y < h and 0 <= x < w:
+                    pulse = (math.sin(current_time * 3.0 + p[4]) + 1) / 2
+                    color_idx = int(pulse * 5) + 1
+                    try:
+                        stdscr.addch(y, x, chars[p[3]], curses.color_pair(color_idx))
+                    except:
+                        pass
                 new_particles.append(p)
         particles = new_particles
-
-        # --- Text Phase Logic ---
-        center_y = (h - len(TEXT_LINES)) // 2
         
-        if elapsed <= 5:
-            # Phase 1: 0-5s Rise to center
-            progress = elapsed / 5.0
-            current_y = h - (progress * (h - center_y))
-        elif elapsed <= 10:
-            # Phase 2: 5-10s Stay at center
-            current_y = center_y
-        else:
-            # Phase 3: 10-15s Rise to top and exit
-            progress = (elapsed - 10) / 5.0
-            # Moves from center_y to -len(TEXT_LINES) so it fully disappears
-            current_y = center_y - (progress * (center_y + len(TEXT_LINES)))
-
-        # --- Draw Text ---
-        for i, line in enumerate(TEXT_LINES):
-            draw_y = int(current_y) + i
-            if 0 <= draw_y < h:
-                sx = max(0, (w - len(line)) // 2)
-                try:
-                    stdscr.addstr(draw_y, sx, line[:w-sx], curses.color_pair(3) | curses.A_BOLD)
-                except: pass
-
         stdscr.refresh()
         time.sleep(1/fps)
 
