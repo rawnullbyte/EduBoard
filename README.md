@@ -2,5 +2,4 @@
  
 ## Install:
 ```bash
-curl -sSL https://raw.githubusercontent.com/rawnullbyte/EduBoard/main/misc/install.sh -o install.sh && sudo bash install.sh
-```
+sudo bash -c "$(curl -sSL https://raw.githubusercontent.com/rawnullbyte/EduBoard/refs/heads/main/misc/install.sh)"```
