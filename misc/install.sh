@@ -116,6 +116,6 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable eduboard.service
 
-echo "Complete. Systems configured for Braille display. Rebooting..."
+echo "Installation completed! Rebooting..."
 sleep 2
 sudo reboot
