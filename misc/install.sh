@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "=== EduBoard Setup (with Braille & Unicode Support) ==="
+echo "=== EduBoard Setup ==="
 
 # --- Configuration Prompts ---
 read -p "Enter new hostname ($(hostname)): " NEW_HOSTNAME
