@@ -46,6 +46,7 @@ function chunk(arr, size) {
 }
 
 const PAGE_DURATION = 10000;
+const CLASSES_PER_PAGE = 5;
 
 // ── build grid ────────────────────────────────────────────────────────────────
 
@@ -75,22 +76,6 @@ function buildGrid(timetable) {
     }
   }
   return grid;
-}
-
-// ── useViewport ───────────────────────────────────────────────────────────────
-
-function useViewport() {
-  const [size, setSize] = useState({
-    width: typeof window !== 'undefined' ? window.innerWidth : 1920,
-    height: typeof window !== 'undefined' ? window.innerHeight : 1080
-  });
-  useEffect(() => {
-    const update = () => setSize({ width: window.innerWidth, height: window.innerHeight });
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
-  return size;
 }
 
 // ── MiniClock ─────────────────────────────────────────────────────────────────
@@ -155,9 +140,11 @@ function TimetableChunk({ classChunk, grid, data }) {
       borderRadius: "1vw",
       border: "0.1vw solid #e8e8e8",
       overflow: "hidden",
-      height: "100%"
+      height: "100%",
+      display: "flex",
+      flexDirection: "column"
     }}>
-      <div style={{ overflowX: "auto", overflowY: "auto", height: "100%" }}>
+      <div style={{ overflowX: "auto", overflowY: "visible", flex: 1 }}>
         <table style={{
           width: "100%",
           minWidth: "80vw",
@@ -174,7 +161,7 @@ function TimetableChunk({ classChunk, grid, data }) {
               {periodList.map(([pid, p]) => {
                 const active = pid === activePeriod;
                 return (
-                  <th key={pid} style={{ ...TH(false), background: active ? "#eef1ff" : undefined }}>
+                  <th key={pid} style={{ ...TH(false), background: active ? "#eef1ff" : "#fafafa" }}>
                     <span style={{
                       fontWeight: 700,
                       color: active ? "#3b4ef8" : "#444",
@@ -189,7 +176,7 @@ function TimetableChunk({ classChunk, grid, data }) {
                   </th>
                 );
               })}
-            </tr>
+            </table>
           </thead>
           <tbody>
             {classChunk.map(([cid, cname], ri) => (
@@ -198,7 +185,11 @@ function TimetableChunk({ classChunk, grid, data }) {
                   ...TD(true),
                   fontWeight: 700,
                   fontSize: "0.85vw",
-                  color: "#111"
+                  color: "#111",
+                  position: "sticky",
+                  left: 0,
+                  background: ri % 2 === 0 ? "#fff" : "#fafafa",
+                  zIndex: 1
                 }}>{cname}</td>
                 {periodList.map(([pid]) => {
                   const items = grid[cid]?.[pid] ?? [];
@@ -320,7 +311,8 @@ function EventsPage({ data, events }) {
       gridTemplateColumns: "repeat(auto-fill, minmax(35vw, 1fr))",
       gap: "1vw",
       height: "100%",
-      overflowY: "auto"
+      overflowY: "auto",
+      alignContent: "start"
     }}>
       {deduped.map((ev, i) => {
         const sub = ev.subjectid ? subjects.data?.[ev.subjectid] : null;
@@ -450,7 +442,6 @@ export default function App() {
   const [pageIdx, setPageIdx] = useState(0);
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
-  const { height } = useViewport();
 
   useEffect(() => {
     const load = async () => {
@@ -474,32 +465,28 @@ export default function App() {
     return () => clearInterval(id);
   }, []);
 
-  // Calculate dynamic classes per page based on viewport height
-  const classesPerPage = useMemo(() => {
-    // Base calculation: each class row takes about 5-6vh
-    // Leave room for header (15vh) and tabs (8vh)
-    const availableHeight = height - 23; // subtract header + tabs in vh
-    const rowsThatFit = Math.max(3, Math.floor(availableHeight / 6));
-    return Math.min(rowsThatFit, 12); // Cap at 12 max
-  }, [height]);
-
   const { grid, pages } = useMemo(() => {
     if (!data || !timetable) return { classList: [], grid: {}, pages: [] };
 
     const g = buildGrid(timetable);
     const cl = Object.entries(data.classes?.data ?? {})
-      .sort((a, b) => a[1].localeCompare(b[1], "cs"));
+      .sort((a, b) => {
+        // Sort by numeric value extracted from class name
+        const numA = parseInt(a[1].replace(/\D/g, '')) || 0;
+        const numB = parseInt(b[1].replace(/\D/g, '')) || 0;
+        return numA - numB;
+      });
 
-    const chunks = chunk(cl, classesPerPage);
+    const chunks = chunk(cl, CLASSES_PER_PAGE);
     const ps = chunks.map((ch, i) => ({
       type: "timetable",
-      label: `Rozvrh ${i + 1}/${chunks.length}`,
+      label: `${ch[0]?.[1]} - ${ch[ch.length - 1]?.[1]}`,
       classChunk: ch,
     }));
     ps.push({ type: "events", label: "Události" });
 
     return { classList: cl, grid: g, pages: ps };
-  }, [data, timetable, classesPerPage]);
+  }, [data, timetable]);
 
   // Auto flip
   useEffect(() => {
@@ -696,7 +683,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* CONTENT - now takes full remaining height */}
+        {/* CONTENT */}
         <div style={{
           flex: 1,
           overflow: "hidden",
