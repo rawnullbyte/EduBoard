@@ -144,12 +144,13 @@ function TimetableChunk({ classChunk, grid, data }) {
       display: "flex",
       flexDirection: "column"
     }}>
-      <div style={{ overflowX: "auto", overflowY: "visible", flex: 1 }}>
+      <div style={{ overflowX: "auto", overflowY: "visible", flex: 1, display: "flex", flexDirection: "column" }}>
         <table style={{
           width: "100%",
           minWidth: "80vw",
           borderCollapse: "collapse",
-          fontSize: "0.9vw"
+          fontSize: "0.9vw",
+          height: "100%"
         }}>
           <colgroup>
             <col style={{ width: "8vw", minWidth: "8vw" }} />
@@ -176,11 +177,14 @@ function TimetableChunk({ classChunk, grid, data }) {
                   </th>
                 );
               })}
-            </table>
+            </tr>
           </thead>
-          <tbody>
+          <tbody style={{ height: "calc(100% - 40px)" }}>
             {classChunk.map(([cid, cname], ri) => (
-              <tr key={cid} style={{ background: ri % 2 === 0 ? "#fff" : "#fafafa" }}>
+              <tr key={cid} style={{
+                background: ri % 2 === 0 ? "#fff" : "#fafafa",
+                height: `${100 / CLASSES_PER_PAGE}%`
+              }}>
                 <td style={{
                   ...TD(true),
                   fontWeight: 700,
@@ -189,7 +193,8 @@ function TimetableChunk({ classChunk, grid, data }) {
                   position: "sticky",
                   left: 0,
                   background: ri % 2 === 0 ? "#fff" : "#fafafa",
-                  zIndex: 1
+                  zIndex: 1,
+                  verticalAlign: "middle"
                 }}>{cname}</td>
                 {periodList.map(([pid]) => {
                   const items = grid[cid]?.[pid] ?? [];
@@ -198,10 +203,11 @@ function TimetableChunk({ classChunk, grid, data }) {
                     <td key={pid} style={{
                       ...TD(false),
                       background: active ? "#f5f7ff" : undefined,
-                      verticalAlign: "top",
-                      padding: "0.5vw 0.3vw"
+                      verticalAlign: "middle",
+                      padding: "0.5vw 0.3vw",
+                      height: "100%"
                     }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "0.3vw" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.3vw", justifyContent: "center" }}>
                         {items.map((item, i) => {
                           const isEvent = item.type === "event";
                           const sub = item.subjectid ? subjects.data?.[item.subjectid] : null;
