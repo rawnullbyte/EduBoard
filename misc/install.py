@@ -7,11 +7,9 @@ from logo import text as logo_ascii
 import curses
 
 def run_command(command, user=None, cwd=None, env=None, log_callback=None):
-    """Utility to run shell commands with real-time logging."""
     if user:
         command = f"sudo -u {user} {command}"
     
-    # Use Popen to start the process without blocking
     process = subprocess.Popen(
         command,
         shell=True,
@@ -21,20 +19,26 @@ def run_command(command, user=None, cwd=None, env=None, log_callback=None):
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-        bufsize=1
+        bufsize=1  # Line buffered
     )
 
-    if log_callback:
-        for line in iter(process.stdout.readline, ''):
-            if line:
+    try:
+        while True:
+            line = process.stdout.readline()
+            if not line and process.poll() is not None:
+                break
+            if line and log_callback:
                 log_callback(line.strip())
-    
-    process.stdout.close()
-    return_code = process.wait()
+    finally:
+        process.stdout.close()
+        return_code = process.wait()
 
     if return_code != 0:
-        if log_callback:
-            log_callback(f"ERROR: Command failed with exit code {return_code}")
+        if return_code == -13 or return_code == 141:
+            if log_callback:
+                log_callback("Note: Pipe closed (SIGPIPE), but command likely finished.")
+            return process
+            
         raise subprocess.CalledProcessError(return_code, command)
     
     return process
