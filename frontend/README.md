@@ -1,16 +1,49 @@
-# React + Vite
+# EduBoard Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The frontend is the kiosk display layer for EduBoard. It consumes the backend's `/api/data`, `/api/timetable`, `/api/events`, and `/health` endpoints and renders a signage-first experience for hallways, classrooms, and shared displays.
 
-Currently, two official plugins are available:
+## What Changed On This Branch
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- `App.jsx` was reshaped into a more deliberate display experience with a stronger header, status pills, richer timetable cards, and cleaner event presentation.
+- `useEduBoardData` now owns fetch/retry/stale-state behavior instead of burying everything inside a single component.
+- Vite now proxies `/api` and `/health` to the backend in development.
+- A small Vitest + Testing Library setup now covers the main render path.
 
-## React Compiler
+## Scripts
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- `npm run dev` starts the Vite dev server.
+- `npm run build` creates the production bundle consumed by FastAPI/Openbox.
+- `npm run lint` runs ESLint.
+- `npm test` runs the frontend test suite once.
+- `npm run test:watch` starts Vitest in watch mode.
 
-## Expanding the ESLint configuration
+## Local Development
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+With the backend running on port `8000`, Vite will proxy:
+
+- `/api/*`
+- `/health`
+
+## Testing
+
+```bash
+cd frontend
+npm test
+npm run lint
+npm run build
+```
+
+## UX Direction
+
+The current UI is intentionally optimized for digital signage:
+
+- a high-contrast, low-glare shell for TVs and kiosks
+- strong hierarchy for "what matters now"
+- resilient empty/error states instead of blank or broken views
+- layouts that remain legible across wide displays and smaller admin previews

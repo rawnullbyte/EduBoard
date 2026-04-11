@@ -1,29 +1,35 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import {
+  AlertTriangle,
+  CalendarDays,
+  Clock as ClockIcon,
+  MapPin,
+  Sparkles,
+  Users,
+} from 'lucide-react';
+import { useEduBoardData } from './hooks/useEduBoardData';
 
 const CYCLE_TIME = 10;
-const REFRESH_INTERVAL = 60;
 const ROWS_PER_PAGE = 6;
-const EMPTY_DATA = {
-  lookup: {},
-  timetable: { classes: [] },
-  events: { classes: [] },
-};
 
 const getLessonStyle = (hexColor) => {
   if (!hexColor) {
-    return { backgroundColor: 'rgba(255,255,255,0.05)', color: '#ffffff' };
+    return {
+      backgroundColor: 'rgba(15, 23, 42, 0.85)',
+      color: '#cbd5f5',
+    };
   }
 
   const color = hexColor.replace('#', '');
   const r = parseInt(color.slice(0, 2), 16);
   const g = parseInt(color.slice(2, 4), 16);
   const b = parseInt(color.slice(4, 6), 16);
-  const brightness = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
 
   return {
     backgroundColor: `#${color}`,
     color: brightness >= 128 ? '#1a1a1a' : '#ffffff',
-    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.1)',
+    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.2)',
   };
 };
 
@@ -33,84 +39,120 @@ const joinMappedValues = (ids, table) =>
     .filter(Boolean)
     .join(', ');
 
-const EmptyState = ({ title, subtitle }) => (
-  <div className="h-full flex flex-col items-center justify-center text-slate-500 text-center px-8">
-    <div className="text-8xl mb-6 opacity-20">🗂️</div>
-    <p className="text-3xl font-light tracking-widest uppercase">{title}</p>
-    {subtitle ? (
-      <p className="mt-4 text-sm uppercase tracking-[0.3em] text-slate-600">{subtitle}</p>
-    ) : null}
+const StatusPill = ({ variant = 'ready', label, icon: Icon }) => {
+  const variantClasses = {
+    ready: 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200',
+    stale: 'border-amber-400/40 bg-amber-500/10 text-amber-200',
+    alert: 'border-rose-500/40 bg-rose-500/10 text-rose-200',
+    outline: 'border-white/20 bg-white/5 text-slate-100',
+  };
+
+  return (
+    <div
+      role="status"
+      className={`inline-flex items-center gap-2 rounded-full border px-4 py-1 text-xs font-semibold uppercase tracking-[0.5em] ${variantClasses[variant]}`}
+    >
+      {Icon ? <Icon className="h-4 w-4" /> : null}
+      <span>{label}</span>
+    </div>
+  );
+};
+
+const ProgressBar = ({ progress }) => (
+  <div className="h-1 w-full bg-white/5">
+    <div
+      className="h-full bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 transition-all duration-200"
+      style={{ width: `${progress}%` }}
+    />
+  </div>
+);
+
+const EmptyState = ({ title, subtitle, icon: Icon }) => (
+  <div className="h-full w-full flex flex-col items-center justify-center gap-4 text-center text-slate-300">
+    {Icon ? <Icon className="h-20 w-20 text-white/30" /> : <span className="text-5xl">🛠️</span>}
+    <p className="text-3xl font-black uppercase tracking-[0.6em]">{title}</p>
+    {subtitle ? <p className="text-xs uppercase tracking-[0.4em] text-slate-500">{subtitle}</p> : null}
+  </div>
+);
+
+const LoadingScene = () => (
+  <div className="min-h-screen w-screen bg-slate-950 text-white flex items-center justify-center">
+    <div className="text-center">
+      <p className="text-xs uppercase tracking-[0.7em] text-slate-400">EduBoard kiosk</p>
+      <p className="mt-4 text-5xl font-black uppercase tracking-[0.4em]">NAČÍTÁNÍ</p>
+      <p className="mt-2 text-lg font-light uppercase tracking-[0.4em] text-slate-500">Prosím vyčkejte</p>
+    </div>
   </div>
 );
 
 const App = () => {
-  const [data, setData] = useState(EMPTY_DATA);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [progress, setProgress] = useState(0);
+  const { data, status, error, stale, lastSuccess } = useEduBoardData();
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  const fetchData = async () => {
-    try {
-      const [lookup, timetable, events] = await Promise.all([
-        fetch('/api/data').then((response) => response.json()),
-        fetch('/api/timetable').then((response) => response.json()),
-        fetch('/api/events').then((response) => response.json()),
-      ]);
+  const rows = useMemo(() => data.timetable?.classes ?? [], [data.timetable]);
+  const lookup = useMemo(() => data.lookup ?? {}, [data.lookup]);
 
-      setData({
-        lookup: lookup ?? {},
-        timetable: timetable ?? { classes: [] },
-        events: events ?? { classes: [] },
-      });
-      setError(lookup?.error || timetable?.error || events?.error || '');
-    } catch (err) {
-      console.error('Data refresh failed', err);
-      setError('Nepodarilo se nacist data z EduBoard serveru.');
-      setData(EMPTY_DATA);
-    } finally {
-      setLoading(false);
+  const periods = useMemo(() => {
+    const raw = lookup.periods?.data ?? {};
+    return Object.values(raw)
+      .filter(Boolean)
+      .sort((left, right) => (left.period ?? 0) - (right.period ?? 0));
+  }, [lookup]);
+
+  const lookupTables = useMemo(
+    () => ({
+      classes: lookup.classes?.data ?? {},
+      subjects: lookup.subjects?.data ?? {},
+      classrooms: lookup.classrooms?.data ?? {},
+      teachers: lookup.teachers?.data ?? {},
+    }),
+    [lookup],
+  );
+
+  const periodLookup = useMemo(() => {
+    const map = new Map();
+    periods.forEach((period) => {
+      if (period?.period != null) {
+        map.set(period.period, period);
+      }
+    });
+    return map;
+  }, [periods]);
+
+  const featuredLesson = useMemo(() => {
+    const firstRow = rows[0];
+    if (!firstRow) {
+      return null;
     }
-  };
+    const items = firstRow.ttitems ?? [];
+    return items[0] ?? null;
+  }, [rows]);
 
-  useEffect(() => {
-    fetchData();
-    const dataTimer = setInterval(fetchData, REFRESH_INTERVAL * 1000);
-    const clockTimer = setInterval(() => setCurrentTime(new Date()), 1000);
-
-    return () => {
-      clearInterval(dataTimer);
-      clearInterval(clockTimer);
-    };
-  }, []);
+  const nowLabel = useMemo(() => {
+    if (!featuredLesson) {
+      return 'Čekáme na rozvrh';
+    }
+    const subjectName =
+      lookupTables.subjects[featuredLesson.subjectid] || featuredLesson.name || 'Neznámý předmět';
+    const periodLabel = periodLookup.get(featuredLesson.uniperiod)?.short;
+    return periodLabel ? `${subjectName} · ${periodLabel}` : subjectName;
+  }, [featuredLesson, lookupTables.subjects, periodLookup]);
 
   const views = useMemo(() => {
     const pages = [];
-    const classes = data.timetable?.classes ?? [];
-
-    for (let index = 0; index < classes.length; index += ROWS_PER_PAGE) {
+    for (let index = 0; index < rows.length; index += ROWS_PER_PAGE) {
       pages.push({
         type: 'timetable',
-        data: classes.slice(index, index + ROWS_PER_PAGE),
+        data: rows.slice(index, index + ROWS_PER_PAGE),
         page: Math.floor(index / ROWS_PER_PAGE) + 1,
-        total: Math.ceil(classes.length / ROWS_PER_PAGE),
+        total: Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE)),
       });
     }
-
-    pages.push({ type: 'pure_events' });
+    pages.push({ type: 'events' });
     return pages;
-  }, [data.timetable]);
-
-  useEffect(() => {
-    setCurrentIndex((prev) => {
-      if (views.length === 0) {
-        return 0;
-      }
-      return prev % views.length;
-    });
-    setProgress(0);
-  }, [views.length]);
+  }, [rows]);
 
   useEffect(() => {
     if (views.length <= 1) {
@@ -120,173 +162,213 @@ const App = () => {
     const timer = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
-          setCurrentIndex((old) => (old + 1) % views.length);
+          setCurrentIndex((value) => (value + 1) % views.length);
           return 0;
         }
-        return prev + (100 / (CYCLE_TIME * 10));
+        return prev + 100 / (CYCLE_TIME * 10);
       });
     }, 100);
 
     return () => clearInterval(timer);
   }, [views.length]);
 
-  if (loading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-[#020617] text-blue-400 font-light text-3xl tracking-widest">
-        NACITANI SYSTEMU...
-      </div>
-    );
+  useEffect(() => {
+    const clockTimer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(clockTimer);
+  }, []);
+
+  if (status === 'loading' && rows.length === 0) {
+    return <LoadingScene />;
   }
 
-  const currentView = views[currentIndex] ?? { type: 'pure_events' };
+  const safeCurrentIndex = views.length ? currentIndex % views.length : 0;
+  const currentView = views[safeCurrentIndex] ?? views[0] ?? { type: 'events' };
+  const nowTime = currentTime.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+  const nowDate = currentTime.toLocaleDateString('cs-CZ', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+  const lastUpdatedLabel = lastSuccess
+    ? new Date(lastSuccess).toLocaleTimeString('cs-CZ', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : 'ještě ne';
+  const statusLabel = error
+    ? 'Omezený režim'
+    : stale
+    ? 'Data mohou být zastaralá'
+    : 'Data v reálném čase';
+  const statusVariant = error ? 'alert' : stale ? 'stale' : 'ready';
 
   return (
-    <div className="h-screen w-screen bg-[#020617] text-slate-100 flex flex-col overflow-hidden font-sans">
-      <div className="w-full h-1.5 bg-slate-900">
-        <div
-          className="h-full bg-gradient-to-r from-blue-600 to-cyan-400 transition-all duration-100 ease-linear"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
-
-      <header className="px-10 py-6 flex justify-between items-center bg-slate-900/40 border-b border-slate-800">
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-col">
-            <h1 className="text-4xl font-black uppercase tracking-tighter text-white">
-              {currentView.type === 'timetable' ? 'Skolni Rozvrh' : 'Dnesni Udalosti'}
-            </h1>
-            {currentView.type === 'timetable' ? (
-              <span className="text-blue-400 font-bold text-sm tracking-widest">
-                STRANA {currentView.page} / {currentView.total}
-              </span>
-            ) : null}
+    <div className="min-h-screen w-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
+      {views.length > 1 ? <ProgressBar progress={progress} /> : null}
+      <div className="sticky top-0 z-10">
+        <div className="px-10 pb-6 pt-8">
+          <div className="flex flex-wrap items-start justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <CalendarDays className="h-10 w-10 text-cyan-400" />
+              <div>
+                <p className="text-xs uppercase tracking-[0.6em] text-slate-400">EduBoard Signal</p>
+                <p className="text-4xl font-black uppercase tracking-tight">Aurora Learning Hub</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-5xl font-black uppercase tracking-tight">{nowTime}</p>
+              <time
+                dateTime={currentTime.toISOString()}
+                className="text-sm uppercase tracking-[0.5em] text-slate-400"
+              >
+                {nowDate}
+              </time>
+            </div>
           </div>
-
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3 text-2xl font-black uppercase tracking-[0.4em] text-white">
+              <Sparkles className="h-7 w-7 text-amber-300" />
+              <span aria-live="polite">{nowLabel}</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <StatusPill
+                variant="outline"
+                icon={ClockIcon}
+                label={`Aktualizováno ${lastUpdatedLabel}`}
+              />
+              <StatusPill variant={statusVariant} icon={Users} label={statusLabel} />
+              {stale && !error ? (
+                <StatusPill
+                  variant="stale"
+                  icon={AlertTriangle}
+                  label="Data mohou být zastaralá"
+                />
+              ) : null}
+            </div>
+          </div>
           {error ? (
-            <div className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-1 text-xs font-bold uppercase tracking-[0.2em] text-amber-200">
-              Omezeny rezim: {error}
+            <div className="mt-4">
+              <StatusPill variant="alert" icon={AlertTriangle} label={error} />
             </div>
           ) : null}
         </div>
-
-        <div className="flex items-center gap-8">
-          <div className="text-right">
-            <div className="text-5xl font-mono font-bold text-white leading-none">
-              {currentTime.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
-            </div>
-            <div className="text-slate-400 text-sm font-medium mt-1 uppercase tracking-widest">
-              {currentTime.toLocaleDateString('cs-CZ', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-              })}
-            </div>
-          </div>
+      </div>
+      <main className="flex-1 px-10 pb-10 pt-6">
+        <div className="flex h-full flex-col gap-4">
+          {currentView.type === 'timetable' ? (
+            <Timetable rows={currentView.data} periods={periods} lookup={lookupTables} />
+          ) : (
+            <PureEvents data={data} lookup={lookupTables} />
+          )}
         </div>
-      </header>
-
-      <main className="flex-1 p-6 overflow-hidden">
-        {currentView.type === 'timetable' ? (
-          <Timetable data={data} rows={currentView.data} />
-        ) : (
-          <PureEvents data={data} />
-        )}
       </main>
     </div>
   );
 };
 
-const Timetable = ({ data, rows }) => {
-  const lookup = data.lookup ?? {};
-  const periods = Object.values(lookup.periods?.data ?? {}).sort(
-    (left, right) => (left.period ?? 0) - (right.period ?? 0),
-  );
-  const classMap = lookup.classes?.data ?? {};
-  const subjectMap = lookup.subjects?.data ?? {};
-  const classroomMap = lookup.classrooms?.data ?? {};
-  const teacherMap = lookup.teachers?.data ?? {};
-
-  if (periods.length === 0 || rows.length === 0) {
+const Timetable = ({ rows, periods, lookup }) => {
+  if (!rows.length || !periods.length) {
     return (
       <EmptyState
-        title="Rozvrh neni k dispozici"
-        subtitle="EduBoard ceka na data z EduPage"
+        icon={Sparkles}
+        title="Rozvrh není k dispozici"
+        subtitle="EduBoard čeká na data z EduPage"
       />
     );
   }
 
+  const { classes: classMap, subjects: subjectMap, classrooms, teachers } = lookup;
+
   return (
-    <div
-      className="h-full w-full grid gap-2"
-      style={{
-        gridTemplateColumns: `minmax(120px, 1fr) repeat(${periods.length}, 3fr)`,
-        gridTemplateRows: `auto repeat(${ROWS_PER_PAGE}, 1fr)`,
-      }}
-    >
-      <div className="bg-slate-800/60 rounded-xl flex items-center justify-center font-black text-slate-500 text-xs tracking-widest uppercase">
-        Trida
-      </div>
-      {periods.map((period) => (
-        <div
-          key={period.period}
-          className="bg-slate-800/40 rounded-xl flex flex-col items-center justify-center p-2 border border-slate-800"
-        >
-          <span className="text-2xl font-black text-white leading-none">{period.short}</span>
-          <span className="text-[10px] text-blue-400 font-bold mt-1 opacity-80">
-            {period.start} - {period.end}
-          </span>
-        </div>
-      ))}
+    <div className="flex h-full flex-col gap-6 overflow-y-auto pr-2 pb-2">
+      {rows.map((classRow) => {
+        const lessonMap = (classRow.ttitems ?? []).reduce((acc, item) => {
+          if (item?.uniperiod != null) {
+            acc[item.uniperiod] = item;
+          }
+          return acc;
+        }, {});
 
-      {rows.map((classRow) => (
-        <React.Fragment key={classRow.id}>
-          <div className="bg-blue-900/20 rounded-xl flex items-center justify-center text-3xl font-black text-white border border-blue-900/30">
-            {classMap[classRow.id] || classRow.id || '-'}
-          </div>
+        const classLabel = classMap[classRow.id] || classRow.id || 'Neznámá třída';
 
-          {periods.map((period) => {
-            const lesson = classRow.ttitems.find((item) => item.uniperiod === period.period);
-            if (!lesson) {
-              return (
-                <div
-                  key={period.period}
-                  className="bg-slate-900/30 rounded-xl border border-slate-800/20"
-                />
-              );
-            }
-
-            const style = getLessonStyle(lesson.colors?.[0]);
-            const classroomNames = joinMappedValues(lesson.classroomids, classroomMap);
-            const teacherNames = joinMappedValues(lesson.teacherids, teacherMap);
-
-            return (
-              <div
-                key={period.period}
-                style={style}
-                className="p-3 flex flex-col justify-center overflow-hidden rounded-xl transition-all border border-black/10"
-              >
-                <div className="text-xl font-black truncate mb-1 leading-none uppercase">
-                  {subjectMap[lesson.subjectid] || lesson.name || 'Neznamy predmet'}
-                </div>
-                <div className="flex flex-col gap-0.5 opacity-90">
-                  <span className="text-xs font-bold truncate">
-                    Ucebna: {classroomNames || '-'}
-                  </span>
-                  <span className="text-[10px] font-medium truncate uppercase tracking-tighter">
-                    Ucitel: {teacherNames || '-'}
-                  </span>
-                </div>
+        return (
+          <article
+            key={classRow.id}
+            className="rounded-[2.5rem] border border-white/5 bg-slate-900/60 p-6 shadow-2xl"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-3xl font-black uppercase tracking-tight text-white">{classLabel}</p>
+                <p className="text-xs uppercase tracking-[0.5em] text-slate-500">Přehled hodin</p>
               </div>
-            );
-          })}
-        </React.Fragment>
-      ))}
+              <div className="text-right text-xs uppercase tracking-[0.5em] text-slate-500">
+                {periods.length} hodin
+              </div>
+            </div>
+            <div className="mt-5 grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+              {periods.map((period) => {
+                const lesson = lessonMap[period.period];
+                if (!lesson) {
+                  return (
+                    <div
+                      key={`${classRow.id}-${period.period}-empty`}
+                      className="min-h-[150px] rounded-2xl border border-white/10 bg-slate-950/40 p-4"
+                    >
+                      <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.5em] text-slate-500">
+                        <span>{period.short}</span>
+                        <span>
+                          {period.start} - {period.end}
+                        </span>
+                      </div>
+                      <div className="mt-4 text-sm font-semibold uppercase tracking-[0.5em] text-slate-400">
+                        Volno
+                      </div>
+                    </div>
+                  );
+                }
+
+                const style = getLessonStyle(lesson.colors?.[0]);
+                const subject = subjectMap[lesson.subjectid] || lesson.name || 'Neznámý předmět';
+                const classroomNames = joinMappedValues(lesson.classroomids, classrooms);
+                const teacherNames = joinMappedValues(lesson.teacherids, teachers);
+
+                return (
+                  <div
+                    key={`${classRow.id}-${period.period}`}
+                    className="min-h-[160px] rounded-[1.8rem] p-4"
+                    style={style}
+                  >
+                    <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.5em]">
+                      <span>{period.short}</span>
+                      <span>
+                        {period.start} - {period.end}
+                      </span>
+                    </div>
+                    <div className="mt-4 text-2xl font-black uppercase leading-tight tracking-tight">
+                      {subject}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-3 text-[10px] uppercase tracking-[0.4em]">
+                      <span className="flex items-center gap-2 text-white/90">
+                        <MapPin className="h-3 w-3" />
+                        {classroomNames || 'Učebna neuvedena'}
+                      </span>
+                      <span className="flex items-center gap-2 text-white/80">
+                        <Users className="h-3 w-3 text-white/80" />
+                        {teacherNames || 'Učitel neuveden'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </article>
+        );
+      })}
     </div>
   );
 };
 
-const PureEvents = ({ data }) => {
-  const classMap = data.lookup?.classes?.data ?? {};
+const PureEvents = ({ data, lookup }) => {
   const allEvents =
     data.events?.classes?.flatMap((entry) =>
       (entry.ttitems ?? []).filter((item) => item.type === 'event' || item.name),
@@ -295,52 +377,85 @@ const PureEvents = ({ data }) => {
   const uniqueEvents = Array.from(
     new Map(
       allEvents.map((item) => [
-        item.eventid ?? `${item.name || 'event'}:${item.starttime || ''}:${item.endtime || ''}`,
+        item.eventid ?? `${item.name}:${item.starttime || ''}:${item.endtime || ''}`,
         item,
       ]),
     ).values(),
   );
 
-  if (uniqueEvents.length === 0) {
+  if (!uniqueEvents.length) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-slate-600">
-        <div className="text-9xl mb-6 opacity-20">🗓️</div>
-        <p className="text-3xl font-light tracking-widest uppercase">
-          Dnes nejsou planovany zadne udalosti
-        </p>
-      </div>
+      <EmptyState
+        icon={CalendarDays}
+        title="Dnes nic nepřipomínáme"
+        subtitle="Žádné naplánované události"
+      />
     );
   }
 
   return (
-    <div className="h-full grid grid-cols-2 gap-8 content-start">
-      {uniqueEvents.map((event) => (
-        <div
-          key={event.eventid ?? `${event.name}:${event.starttime}:${event.endtime}`}
-          className="bg-gradient-to-br from-blue-600 to-indigo-700 p-10 rounded-[2rem] shadow-2xl flex flex-col justify-center relative overflow-hidden group"
-        >
-          <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
-            <div className="text-9xl">📅</div>
-          </div>
-
-          <div className="text-blue-100 text-2xl font-bold uppercase tracking-widest mb-4 flex items-center gap-3">
-            <span className="bg-white/20 px-4 py-1 rounded-full">
-              {event.starttime || '--:--'} - {event.endtime || '--:--'}
-            </span>
-          </div>
-
-          <h2 className="text-6xl font-black leading-tight text-white drop-shadow-lg">
-            {event.name || 'Udalost bez nazvu'}
-          </h2>
-
-          <div className="mt-6 flex gap-4 text-blue-100/80 font-bold uppercase text-sm tracking-widest">
-            <span>
-              Tridy: {joinMappedValues(event.classids, classMap) || 'Cela skola'}
-            </span>
-          </div>
-        </div>
-      ))}
+    <div className="h-full overflow-y-auto pb-2">
+      <div className="grid min-h-full gap-6 md:grid-cols-2 xl:grid-cols-3">
+        {uniqueEvents.map((event) => (
+          <EventCard key={event.eventid || `${event.name}:${event.starttime}`} event={event} lookup={lookup} />
+        ))}
+      </div>
     </div>
+  );
+};
+
+const EventCard = ({ event, lookup }) => {
+  const { classes: classMap, classrooms } = lookup;
+  const timeline = `${event.starttime || '--:--'} - ${event.endtime || '--:--'}`;
+  const classNames = joinMappedValues(event.classids, classMap);
+  const roomNames = joinMappedValues(event.classroomids, classrooms);
+
+  return (
+    <article className="flex h-full flex-col justify-between gap-4 overflow-hidden rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-blue-700/90 via-indigo-900/80 to-slate-900/80 p-8 shadow-2xl">
+      <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.6em] text-blue-200/80">
+        <div className="flex items-center gap-2">
+          <ClockIcon className="h-4 w-4" />
+          <span>{timeline}</span>
+        </div>
+        <span>{(event.type || 'Událost').toUpperCase()}</span>
+      </div>
+      <h3
+        className="text-4xl font-black leading-tight text-white"
+        style={{
+          display: '-webkit-box',
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+        }}
+      >
+        {event.name || 'Událost bez názvu'}
+      </h3>
+      <div className="flex flex-col gap-2 text-sm uppercase tracking-[0.5em] text-blue-100/80">
+        <span className="flex items-center gap-2">
+          <Users className="h-4 w-4" />
+          <span>{classNames || 'Celá škola'}</span>
+        </span>
+        {roomNames ? (
+          <span className="flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            <span>{roomNames}</span>
+          </span>
+        ) : null}
+      </div>
+      {event.description ? (
+        <p
+          className="text-sm text-white/85"
+          style={{
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {event.description}
+        </p>
+      ) : null}
+    </article>
   );
 };
 
