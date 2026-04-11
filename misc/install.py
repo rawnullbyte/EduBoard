@@ -224,9 +224,17 @@ DISPLAY=:0
         user=username, 
         log_callback=engine.log
     )
+
+    # --- X11 Config ---
+    engine.log("")
+    engine.log("→ Configuring X11 permissions...")
+    xwrapper_content = """allowed_users=anybody
+    needs_root_rights=yes
+    """
+    write_file("/etc/X11/Xwrapper.config", xwrapper_content)
+    engine.log("✓ X11 configuration written")
     
     # --- X11 Auto-start ---
-    engine.log("")
     engine.log("→ Configuring auto-login...")
     
     xinitrc_content = '''#!/bin/bash

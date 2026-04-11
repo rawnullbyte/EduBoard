@@ -67,7 +67,7 @@ def main(stdscr):
     engine.sleep(3)
 
     engine.log("Launching graphical interface...")
-    os.execvp("startx", ["startx"])
+    os.execvp("startx", ["startx", "--", ":0", "vt2", "-keeptty"])
 
 if __name__ == "__main__":
     curses.wrapper(main)
