@@ -119,7 +119,7 @@ def main(stdscr):
         engine.log(f"  User '{username}' already exists")
     except KeyError:
         run_command(f"sudo adduser --disabled-password --gecos '' {username}", log_callback=engine.log)
-        run_command(f"echo '{username}:{password}' | sudo chpasswd")
+        run_command(f"echo '{username} ALL=(ALL) NOPASSWD: /usr/bin/chvt' | sudo tee /etc/sudoers.d/kiosk-chvt")
         engine.log(f"✓ Created user '{username}'")
     
     # Get user UID for later use
@@ -281,7 +281,7 @@ hwaccel
     write_file("/etc/kmscon/kmscon.conf", kmscon_conf_content)
     engine.log("✓ KMSCON configuration written")
 
-    # Systemd override for auto-login (boot.py runs on tty1, shows splash then exits)
+    # Systemd override for tty1 (boot.py)
     override_dir = "/etc/systemd/system/kmsconvt@tty1.service.d"
     override_content = f"""[Service]
 ExecStart=
@@ -299,7 +299,7 @@ ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/km
     # Enable KMSCON and Cage services
     run_command("sudo systemctl enable kmsconvt@tty1.service", log_callback=engine.log)
     run_command("sudo systemctl enable cage-kiosk.service", log_callback=engine.log)
-    engine.log("✓ KMSCON and Cage services enabled")
+    engine.log("✓ Services enabled")
 
     # --- Final Setup ---
     engine.log("")
@@ -311,11 +311,6 @@ ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/km
     engine.log("╔══════════════════════════════════════╗")
     engine.log("║       Installation Complete!         ║")
     engine.log("╚══════════════════════════════════════╝")
-    engine.log("")
-    engine.log("Architecture:")
-    engine.log("  • tty1: KMSCON → boot.py (splash/debug, then exits)")
-    engine.log("  • tty2: Cage → Firefox (kiosk)")
-    engine.log("  • bg:   EduBoard.service (backend)")
     engine.log("")
     engine.log("System will reboot in 3 seconds...")
     

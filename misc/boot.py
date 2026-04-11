@@ -12,7 +12,7 @@ def main(stdscr):
     engine.animate_ascii_move(duration=3, direction="up")
     engine.sleep(1)
     engine.animate_ascii_move(duration=3, direction="out")
-    subprocess.run(["chvt", "2"])
+    subprocess.run(["sudo", "chvt", "2"])
 
     while True:
         pass
