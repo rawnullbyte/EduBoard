@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 import subprocess
 import os
-import socket
+import curses
 from aengine import AnimationEngine
 from logo import text as logo_ascii
-import curses
 
 def main(stdscr):
     engine = AnimationEngine(stdscr)
@@ -27,16 +26,7 @@ def main(stdscr):
     engine.sleep(1)
     engine.animate_ascii_move(duration=3, direction="out")
 
-    tty = os.readlink("/proc/self/fd/0").replace("/dev/", "")
-    engine.log(f"TTY: {tty}")
-    engine.sleep(2)
-    if tty == "tty2":
-        os.environ["XDG_RUNTIME_DIR"] = f"/run/user/{os.getuid()}"
-        os.execv("/usr/bin/cage", ["/usr/bin/cage", "-s", "--", "/usr/bin/firefox-esr", "--kiosk", "http://localhost:8000"])
-    else:
-        subprocess.run(["sudo", "chvt", "2"])
-        while True:
-            pass
+    subprocess.run(["sudo", "chvt", "2"])
 
 if __name__ == "__main__":
     curses.wrapper(main)

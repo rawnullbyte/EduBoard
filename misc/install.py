@@ -252,6 +252,31 @@ hwaccel
     write_file("/etc/kmscon/kmscon.conf", kmscon_conf_content)
     engine.log("✓ KMSCON configuration written")
 
+    engine.log("→ Creating Kiosk service for TTY2...")
+    
+    kiosk_service_content = f"""[Unit]
+Description=EduBoard Kiosk (Cage) on TTY2
+After=network.target EduBoard.service
+Requires=EduBoard.service
+
+[Service]
+User={username}
+Group={username}
+Environment=XDG_RUNTIME_DIR=/run/user/{uid}
+Environment=WAYLAND_DISPLAY=wayland-0
+StandardInput=tty
+StandardOutput=tty
+TTYPath=/dev/tty2
+ExecStartPre=/usr/bin/chvt 2
+ExecStart=/usr/bin/cage -s -- /bin/bash -c "while ! curl -s http://localhost:8000 > /dev/null; do sleep 1; done; /usr/bin/firefox-esr --kiosk http://localhost:8000"
+estart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+"""
+    write_file("/etc/systemd/system/kiosk.service", kiosk_service_content)
+
     # Systemd override for tty1 (boot.py)
     override_dir = "/etc/systemd/system/kmsconvt@tty1.service.d"
     override_content = f"""[Service]
@@ -260,15 +285,6 @@ ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/km
 """
     write_file(f"{override_dir}/override.conf", override_content)
     engine.log(f"✓ KMSCON configured for user '{username}' on tty1")
-
-    # Systemd override for tty2 (Cage)
-    override_dir = "/etc/systemd/system/kmsconvt@tty2.service.d"
-    override_content = f"""[Service]
-ExecStart=
-ExecStart=/usr/libexec/kmscon/kmscon --vt tty2 --seats seat0 --configdir /etc/kmscon --term xterm-256color --login -- /bin/su -l {username} -c "exec {venv_dir}/bin/python {repo_dir}/misc/boot.py"
-"""
-    write_file(f"{override_dir}/override.conf", override_content)
-    engine.log(f"✓ KMSCON configured for user '{username}' on tty2")
 
     # Disable conflicting services
     engine.log("  Disabling conflicting terminal services...")
@@ -279,7 +295,6 @@ ExecStart=/usr/libexec/kmscon/kmscon --vt tty2 --seats seat0 --configdir /etc/km
     
     # Enable KMSCON and Cage services
     run_command("sudo systemctl enable kmsconvt@tty1.service", log_callback=engine.log)
-    run_command("sudo systemctl enable kmsconvt@tty2.service", log_callback=engine.log)
     engine.log("✓ Services enabled")
 
     # --- Final Setup ---
@@ -287,6 +302,7 @@ ExecStart=/usr/libexec/kmscon/kmscon --vt tty2 --seats seat0 --configdir /etc/km
     engine.log("→ Finalizing installation...")
     run_command("sudo systemctl daemon-reload")
     run_command("sudo systemctl enable EduBoard.service", log_callback=engine.log)
+    run_command("sudo systemctl enable kiosk.service", log_callback=engine.log)
     
     engine.log("")
     engine.log("╔══════════════════════════════════════╗")
