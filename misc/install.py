@@ -33,7 +33,8 @@ def run_command(command, user=None, cwd=None, env=None, log_callback=None):
         if log_callback:
             log_callback(f"ERROR: {process.stderr}")
         raise subprocess.CalledProcessError(process.returncode, full_command, output=process.stdout, stderr=process.stderr)
-    
+    log_callback(f"OUTPUT: {process.stderr}")
+
     return process
 
 def write_file(path, content, user=None, mode=0o644):
@@ -93,12 +94,17 @@ def main(stdscr):
     run_command("sudo apt update")
     deps = [
         "curl", "git", "build-essential", "python3-full", "python3-venv", "nodejs",
-        "xserver-xorg", "xinit", "openbox", "firefox", "fbterm", "fonts-terminus"
+        "xserver-xorg", "xinit", "openbox", "firefox", "fbterm", "fonts-terminus",
+        "fonts-noto-core", "fonts-dejavu-core"
     ]
     run_command(f"sudo apt install -y {' '.join(deps)}")
 
     engine.log("Granting fbterm TTY permissions...")
     run_command("sudo setcap 'cap_sys_tty_config+ep' /usr/bin/fbterm")
+
+    engine.log("Generating Locales...")
+    run_command("sudo locale-gen en_US.UTF-8")
+    run_command("sudo update-locale LANG=en_US.UTF-8")
 
     # --- App Setup ---
     if not os.path.exists(repo_dir):
@@ -118,9 +124,10 @@ def main(stdscr):
     bash_profile = f"""
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
 
 if [[ $(tty) == /dev/tty1 && -z "$FBTERM_TTY" ]]; then
-    exec fbterm -- {venv_dir}/bin/python {repo_dir}/misc/boot.py
+    exec fbterm -s 14 -- {venv_dir}/bin/python {repo_dir}/misc/boot.py
 fi
 """
     write_file(f"{home_dir}/.bash_profile", bash_profile, user=username)
