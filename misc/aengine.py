@@ -110,9 +110,7 @@ class AnimationEngine:
         
         result = self.input_result
         self.input_active = False
-        
-        if result:
-            self.log(f"User input: {result}")
+
         return result
 
     def _get_win_coords(self):

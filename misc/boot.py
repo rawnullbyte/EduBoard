@@ -64,7 +64,6 @@ def main(stdscr):
     result = subprocess.run(["date"], capture_output=True, text=True)
     engine.log(f"System Time: {result.stdout.strip()}")
     
-    engine.log("=" * 30)
     engine.sleep(3)
 
     engine.log("Launching graphical interface...")

@@ -17,16 +17,15 @@ def run_command(command, user=None, cwd=None, log_callback=None):
     })
     
     directory = cwd if cwd else "."
-    setup_env = "export TERM=xterm-256color DEBIAN_FRONTEND=noninteractive LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 && "
     
     if user:
         escaped_command = command.replace("'", "'\\''")
-        full_command = f"sudo -u {user} -i {setup_env} cd {directory} && {escaped_command}"
+        full_command = f"sudo -u {user} -i cd {directory} && {escaped_command}"
     else:
-        full_command = f"{setup_env} {command}"
+        full_command = command
 
-    if log_callback:
-        log_callback(f"→ {command}")
+    # if log_callback:
+    #     log_callback(f"→ {command}")
 
     process = subprocess.run(
         full_command, shell=True, executable="/bin/bash",
@@ -151,6 +150,7 @@ def main(stdscr):
         "fonts-noto-core",
         "fonts-dejavu",
         "fonts-wqy-microhei",
+        "kmscon"
         "xorg",
         "openbox",
         "xinit",
@@ -160,11 +160,11 @@ def main(stdscr):
     ]
     
     package_list = " ".join(packages)
-    engine.log(f"  Installing: {package_list}")
+    engine.log(f"  Installing dependencies... (This may take some time!)")
     run_command(f"sudo apt install -y {package_list}", log_callback=engine.log)
     engine.log("✓ Dependencies installed")
 
-    # --- Disable screensaver but keep DPMS ---
+    # --- Disable screensaver ---
     engine.log("")
     engine.log("→ Disabling screensaver (DPMS remains enabled)...")
     
@@ -254,21 +254,37 @@ exec openbox-session
 '''
     write_file(f"{home_dir}/.xinitrc", xinitrc_content, user=username, mode=0o755)
     
-    bash_profile_content = '''if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-    exec startx
-fi
-'''
-    write_file(f"{home_dir}/.bash_profile", bash_profile_content, user=username)
+
+   # --- KMSCON Terminal Configuration ---
+    engine.log("")
+    engine.log("→ Configuring KMSCON terminal...")
     
-    autologin_service_content = f'''[Service]
+    kmscon_conf_content = """font-name=DejaVu Sans Mono, WenQuanYi Micro Hei Mono
+font-size=14
+term=xterm-256color
+hwaccel
+"""
+    write_file("/etc/kmscon/kmscon.conf", kmscon_conf_content)
+    engine.log("✓ KMSCON configuration written")
+
+    # Systemd override for auto-login
+    override_dir = "/etc/systemd/system/kmsconvt@tty1.service.d"
+    override_content = f"""[Service]
 ExecStart=
-ExecStart=-/sbin/agetty --autologin {username} --noclear %I $TERM
-Type=idle
-'''
-    write_file("/etc/systemd/system/getty@tty1.service.d/autologin.conf", autologin_service_content)
+ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/kmscon --term xterm-256color --login -- /bin/su -l {username} -c "exec {venv_dir}/bin/python {repo_dir}/misc/boot.py"
+"""
+    write_file(f"{override_dir}/override.conf", override_content)
+    engine.log(f"✓ Auto-login configured for user '{username}'")
+
+    # Disable conflicting services
+    engine.log("  Disabling conflicting terminal services...")
+    run_command("sudo systemctl mask getty@tty1.service")
+    run_command("sudo systemctl mask serial-getty@ttyS0.service")
+    run_command("sudo systemctl mask serial-getty@hvc0.service")
     
-    run_command("sudo systemctl set-default graphical.target", log_callback=engine.log)
-    engine.log("✓ Auto-login configured")
+    # Enable KMSCON
+    run_command("sudo systemctl enable kmsconvt@tty1.service", log_callback=engine.log)
+    engine.log("✓ KMSCON service enabled")
 
     # --- Final Setup ---
     engine.log("")
