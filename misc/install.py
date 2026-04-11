@@ -101,7 +101,6 @@ def main(stdscr):
     screen_id = engine.ask("Screen Identifier", "1") or "1"
     password = engine.ask("Kiosk Password", "123456") or "123456"
     
-    engine.log("")
     engine.log("Configuration Summary:")
     engine.log(f"  • Hostname:   {hostname}")
     engine.log(f"  • User:       {username}")
@@ -150,7 +149,7 @@ def main(stdscr):
         "fonts-noto-core",
         "fonts-dejavu",
         "fonts-wqy-microhei",
-        "kmscon"
+        "kmscon",
         "xorg",
         "openbox",
         "xinit",
