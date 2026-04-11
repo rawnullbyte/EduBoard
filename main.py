@@ -236,13 +236,16 @@ class ScreenManager():
         self.edub = edub_instance
 
     def set_screen(self, state: bool):
-        cmd = "--on" if state else "--off"
         try:
             env = os.environ.copy()
             env["WAYLAND_DISPLAY"] = os.getenv("WAYLAND_DISPLAY", "wayland-0")
             env["XDG_RUNTIME_DIR"] = os.getenv("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
-            subprocess.run(["wlopm", cmd, "*"], check=True, env=env)
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] wlopm {cmd}")
+            flag = "--on" if state else "--off"
+            result = subprocess.run(["wlr-randr"], capture_output=True, text=True, env=env)
+            outputs = [line.split()[0] for line in result.stdout.splitlines() if line and not line.startswith(" ") and not line.startswith("\t")]
+            for output in outputs:
+                subprocess.run(["wlr-randr", "--output", output, flag], check=True, env=env)
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] wlr-randr {flag} on {outputs}")
         except Exception as e:
             print(f"Error controlling screen: {e}")
 

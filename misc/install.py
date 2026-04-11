@@ -155,7 +155,7 @@ def main(stdscr):
         "kmscon",
         "cage",
         "firefox-esr",
-        "wlopm"
+        "wlr-randr"
     ]
     
     package_list = " ".join(packages)
@@ -245,12 +245,14 @@ Type=simple
 ExecStartPre=/bin/mkdir -p /run/user/{uid}
 ExecStartPre=/bin/chown {username}:{username} /run/user/{uid}
 ExecStartPre=/bin/chmod 700 /run/user/{uid}
-ExecStart=/usr/bin/cage -s -- /usr/bin/firefox-esr --kiosk http://localhost:8000
+ExecStart=/usr/bin/cage -s -- /usr/bin/firefox-esr --kiosk --no-default-browser-check http://localhost:8000
 Restart=always
 RestartSec=3
 User={username}
 Environment=XDG_RUNTIME_DIR=/run/user/{uid}
 Environment=MOZ_ENABLE_WAYLAND=1
+Environment=XCURSOR_THEME=
+Environment=XCURSOR_SIZE=1
 UtmpIdentifier=tty2
 UtmpMode=user
 TTYPath=/dev/tty2
