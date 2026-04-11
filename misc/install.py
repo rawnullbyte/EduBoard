@@ -170,7 +170,10 @@ fi
 
     # .xinitrc
     xinitrc = """
-xset -dpms s off noblank
+xset +dpms
+xset dpms 0 0 0
+xset s off
+xset s noblank
 unclutter -idle 1 &
 exec openbox-session
 """
