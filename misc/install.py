@@ -6,13 +6,6 @@ from aengine import AnimationEngine
 from logo import text as logo_ascii
 import curses
 
-
-import subprocess
-import os
-
-import subprocess
-import os
-
 def run_command(command, user=None, cwd=None, env=None, log_callback=None):
     custom_env = os.environ.copy()
     custom_env["DEBIAN_FRONTEND"] = "noninteractive"
@@ -46,20 +39,15 @@ def run_command(command, user=None, cwd=None, env=None, log_callback=None):
     return process
 
 def write_file(path, content, user=None, mode=0o644):
-    """Writes content to a file and sets ownership/permissions."""
     path = Path(path)
-    # Ensure directory exists
     path.parent.mkdir(parents=True, exist_ok=True)
-    
     with open(path, "w") as f:
         f.write(content)
-    
     if user:
         shutil.chown(path, user=user, group=user)
     os.chmod(path, mode)
 
 def set_hostname(hostname, log_callback=None):
-    """Change the system hostname."""
     try:
         run_command(f"sudo hostnamectl set-hostname {hostname}")
         write_file("/etc/hostname", f"{hostname}\n")
@@ -83,10 +71,8 @@ def set_hostname(hostname, log_callback=None):
             new_lines.insert(1, f"127.0.1.1\t{hostname}")
         
         write_file("/etc/hosts", '\n'.join(new_lines))
-        
         if log_callback:
             log_callback(f"Hostname changed to: {hostname}")
-        
         return True
     except Exception as e:
         if log_callback:
@@ -101,27 +87,12 @@ def main(stdscr):
     engine.animate_ascii_move(duration=3, direction="out")
     engine.log("=== EduBoard Setup ===")
     
-
     # --- Configuration ---
-    hostname = engine.ask("Hostname: ", placeholder="tv1")
-    if not hostname:
-        hostname = "tv1"
-    
-    username = engine.ask("Kiosk Username: ", placeholder="kiosk")
-    if not username:
-        username = "kiosk"
-    
-    subdomain = engine.ask("Subdomain: ", placeholder="schoolname")
-    if not subdomain:
-        subdomain = "schoolname"
-    
-    screen_id = engine.ask("Screen ID: ", placeholder="9")
-    if not screen_id:
-        screen_id = "1"
-    
-    password = engine.ask("Password: ", placeholder="123456")
-    if not password:
-        password = "123456"
+    hostname = engine.ask("Hostname: ", placeholder="tv1") or "tv1"
+    username = engine.ask("Kiosk Username: ", placeholder="kiosk") or "kiosk"
+    subdomain = engine.ask("Subdomain: ", placeholder="schoolname") or "schoolname"
+    screen_id = engine.ask("Screen ID: ", placeholder="9") or "1"
+    password = engine.ask("Password: ", placeholder="123456") or "123456"
 
     home_dir = f"/home/{username}"
     repo_dir = f"{home_dir}/EduBoard"
@@ -129,70 +100,70 @@ def main(stdscr):
 
     # --- Set Hostname ---
     engine.log(f"Setting hostname to: {hostname}")
-    if not set_hostname(hostname, engine.log):
-        engine.log("WARNING: Failed to set hostname, continuing anyway...")
+    set_hostname(hostname, engine.log)
 
-    # --- System & User ---
+    # --- User Setup ---
     try:
         subprocess.run(["id", username], check=True, capture_output=True)
     except subprocess.CalledProcessError:
+        engine.log(f"Creating user {username}...")
         run_command(f"sudo adduser --disabled-password --gecos '' {username}")
     
     run_command(f"sudo usermod -aG video,audio,input,tty,render {username}")
 
+    # --- Node.js 22 Upgrade ---
+    engine.log("Configuring NodeSource for Node.js 22 (LTS)...")
+    run_command("curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -")
+
     # --- Dependencies ---
     engine.log("Updating system and installing dependencies...")
-    run_command("sudo apt update && sudo apt upgrade -y")
+    run_command("sudo apt update")
     deps = [
         "curl", "git", "build-essential", "python3-full", "python3-venv", "nodejs",
         "xserver-xorg", "x11-xserver-utils", "xinit", "openbox", "firefox", 
-        "unclutter", "dbus-x11", "fonts-freefont-ttf", "fonts-noto-core", "npm"
+        "unclutter", "dbus-x11", "fonts-freefont-ttf", "fonts-noto-core"
     ]
     run_command(f"sudo apt install -y {' '.join(deps)}")
 
     # --- App Setup ---
     if not os.path.exists(repo_dir):
+        engine.log("Cloning EduBoard repository...")
         run_command(f"git clone https://github.com/rawnullbyte/EduBoard.git {repo_dir}", user=username)
     else:
+        engine.log("Updating EduBoard repository...")
         run_command("git pull", user=username, cwd=repo_dir)
 
     # Create .env
-    env_content = f"""SCHOOL_SUBDOMAIN={subdomain}
-SCREEN_ID={screen_id}
-PASSWORD={password}
-"""
+    engine.log("Writing configuration to .env...")
+    env_content = f"SCHOOL_SUBDOMAIN={subdomain}\nSCREEN_ID={screen_id}\nPASSWORD={password}\n"
     write_file(f"{repo_dir}/.env", env_content, user=username)
 
     # Python Venv & Requirements
+    engine.log("Setting up Python virtual environment...")
     run_command(f"python3 -m venv {venv_dir}", user=username)
     run_command(f"{venv_dir}/bin/pip install --upgrade pip", user=username)
     if os.path.exists(f"{repo_dir}/requirements.txt"):
+        engine.log("Installing Python requirements...")
         run_command(f"{venv_dir}/bin/pip install -r requirements.txt", user=username, cwd=repo_dir)
 
     # Frontend Build
     frontend_dir = f"{repo_dir}/frontend"
     if os.path.exists(frontend_dir):
-        run_command("npm ci --no-audit && npm run build", user=username, cwd=frontend_dir)
+        engine.log("Installing NPM dependencies...")
+        run_command("npm install", user=username, cwd=frontend_dir)
+        
+        engine.log("Building frontend production assets...")
+        run_command("npm run build", user=username, cwd=frontend_dir)
 
     # --- Config Files ---
+    engine.log("Configuring boot and desktop environment...")
     
     # .bash_profile
-    bash_profile = f"""
-if [[ -z $DISPLAY && $(tty) = /dev/tty1 ]]; then
-    {venv_dir}/bin/python {repo_dir}/misc/boot.py
-fi
-"""
+    bash_profile = f"if [[ -z $DISPLAY && $(tty) = /dev/tty1 ]]; then\n    {venv_dir}/bin/python {repo_dir}/misc/boot.py\nfi\n"
     write_file(f"{home_dir}/.bash_profile", bash_profile, user=username)
 
     # .xinitrc
-    xinitrc = """
-xset +dpms
-xset dpms 0 0 0
-xset s off
-xset s noblank
-unclutter -idle 1 &
-exec openbox-session
-"""
+    xinitrc = "xset +dpms\nxset dpms 0 0 0\nxset s off\nxset s noblank\nunclutter -idle 1 &\nexec openbox-session\n"
     write_file(f"{home_dir}/.xinitrc", xinitrc, user=username)
 
     # Openbox Autostart
@@ -201,16 +172,12 @@ exec openbox-session
     write_file(f"{openbox_dir}/autostart", autostart, user=username)
 
     # --- Systemd Overrides & Services ---
-    # Getty Auto-login
+    engine.log("Setting up system services...")
     getty_dir = "/etc/systemd/system/getty@tty1.service.d"
-    getty_conf = f"""[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin {username} --noclear %I $TERM
-"""
+    getty_conf = f"[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin {username} --noclear %I $TERM\n"
     os.makedirs(getty_dir, exist_ok=True)
     write_file(f"{getty_dir}/override.conf", getty_conf)
 
-    # Backend Service
     service_content = f"""[Unit]
 Description=EduBoard Backend
 After=network.target
@@ -228,11 +195,11 @@ WantedBy=multi-user.target
     write_file("/etc/systemd/system/eduboard.service", service_content)
 
     # --- Finalize ---
+    engine.log("Enabling services and finalizing...")
     run_command("sudo systemctl daemon-reload")
     run_command("sudo systemctl enable eduboard.service")
     
     engine.log("Setup finished. Rebooting in 5 seconds...")
-    engine.log(f"System will reboot with hostname: {hostname}")
     run_command("sleep 5 && sudo reboot")
 
 if __name__ == "__main__":
