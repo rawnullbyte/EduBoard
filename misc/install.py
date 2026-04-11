@@ -167,9 +167,6 @@ def main(stdscr):
     run_command("wget https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-amd64.deb -O /tmp/fastfetch.deb", log_callback=engine.log)
     run_command("sudo dpkg -i /tmp/fastfetch.deb", log_callback=engine.log)
     engine.log("✓ Fastfetch installed")
-    fastfetch_conf_content = """{"display": {"color": {"separator": "white"}, "separator": " ", "colorKeys": false, "colorTitle": false}}"""
-    write_file(f"{home_dir}/.config/fastfetch/config.jsonc", fastfetch_conf_content, user=username)
-    engine.log("✓ Fastfetch config written")
 
     # --- Application Setup ---
     engine.log("")

@@ -11,7 +11,7 @@ def main(stdscr):
 
     try:
         result = subprocess.run(
-            ["fastfetch", "--logo", "none", "--no-color"],
+            ["fastfetch", "--logo", "none", "--structure-disabled", "colors"],
             capture_output=True, text=True
         )
         for line in result.stdout.splitlines():
