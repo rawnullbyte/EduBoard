@@ -67,7 +67,37 @@ def main(stdscr):
     engine.sleep(3)
 
     engine.log("Launching graphical interface...")
-    os.execvp("startx", ["startx", "--", ":0", "vt2", "-keeptty"])
+    
+    try:
+        x_process = subprocess.Popen(
+            ["startx", "--", ":0", "vt2", "-keeptty"],
+            stdout=subprocess.DEVNULL, 
+            stderr=subprocess.DEVNULL
+        )
+
+
+        log_path = os.path.expanduser("~/.local/share/xorg/Xorg.0.log")
+        if not os.path.exists(log_path):
+            log_path = "/var/log/Xorg.0.log"
+
+        tail_proc = subprocess.Popen(
+            ["tail", "-f", log_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
+
+        for line in iter(tail_proc.stdout.readline, ""):
+            if line:
+                engine.log(line.strip())
+            
+            if x_process.poll() is not None:
+                engine.log("X server process has terminated.")
+                break
+
+    except Exception as e:
+        engine.log(f"Error monitoring X11: {str(e)}")
+        engine.sleep(5)
 
 if __name__ == "__main__":
     curses.wrapper(main)
