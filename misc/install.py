@@ -272,7 +272,7 @@ Environment=LIBSEAT_BACKEND=seatd
 Environment=WLR_LIBINPUT_NO_DEVICES=1
 Environment=WLR_NO_HARDWARE_CURSORS=1
 
-ExecStartPre=/bin/bash -c 'until [ "$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000)" -eq 200 ]; do sleep 1; done; sleep 3'
+ExecStartPre=/bin/bash -c 'until [ "$(curl -s -o /dev/null -w "%%{http_code}" http://localhost:8000)" -eq 200 ]; do sleep 1; done; sleep 3'
 ExecStart=/usr/bin/cage -s -- /usr/bin/firefox-esr --kiosk http://localhost:8000
 
 Restart=always
