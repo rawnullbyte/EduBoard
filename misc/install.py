@@ -7,27 +7,35 @@ from logo import text as logo_ascii
 import curses
 
 def run_command(command, user=None, cwd=None, env=None, log_callback=None):
-    """Utility to run shell commands."""
+    """Utility to run shell commands with real-time logging."""
     if user:
         command = f"sudo -u {user} {command}"
     
-    process = subprocess.run(
+    # Use Popen to start the process without blocking
+    process = subprocess.Popen(
         command,
         shell=True,
-        check=True,
         executable="/bin/bash",
         cwd=cwd,
         env=env,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1
     )
+
+    if log_callback:
+        for line in iter(process.stdout.readline, ''):
+            if line:
+                log_callback(line.strip())
     
-    # Log output if callback provided
-    if log_callback and process.stdout:
-        log_callback(process.stdout)
-    if log_callback and process.stderr:
-        log_callback(f"STDERR: {process.stderr}")
+    process.stdout.close()
+    return_code = process.wait()
+
+    if return_code != 0:
+        if log_callback:
+            log_callback(f"ERROR: Command failed with exit code {return_code}")
+        raise subprocess.CalledProcessError(return_code, command)
     
     return process
 
