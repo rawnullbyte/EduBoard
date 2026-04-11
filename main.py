@@ -236,10 +236,13 @@ class ScreenManager():
         self.edub = edub_instance
 
     def set_screen(self, state: bool):
-        cmd = "on" if state else "off"
+        cmd = "--on" if state else "--off"
         try:
-            subprocess.run(["xset", f"dpms", "force", cmd], check=True)
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] xset dpms force {cmd}")
+            env = os.environ.copy()
+            env["WAYLAND_DISPLAY"] = os.getenv("WAYLAND_DISPLAY", "wayland-0")
+            env["XDG_RUNTIME_DIR"] = os.getenv("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+            subprocess.run(["wlopm", cmd, "*"], check=True, env=env)
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] wlopm {cmd}")
         except Exception as e:
             print(f"Error controlling screen: {e}")
 
@@ -247,25 +250,19 @@ class ScreenManager():
         while True:
             try:
                 tt_data = self.edub.fetchTimetableData()
-                rows = tt_data.get("r", {}).get("rows", [])
-                
                 all_items = []
-                for row in rows:
-                    all_items.extend(row.get("ttitems", []))
-                
+                for cls in tt_data.get("classes", []):
+                    all_items.extend(cls.get("ttitems", []))
                 if not all_items:
                     self.set_screen(False)
                 else:
                     now_str = datetime.now().strftime("%H:%M")
                     is_in_class = any(item['starttime'] <= now_str < item['endtime'] for item in all_items)
-                    
                     school_start = min(item['starttime'] for item in all_items)
                     school_end = max(item['endtime'] for item in all_items)
-                    
                     self.set_screen((school_start <= now_str < school_end) and not is_in_class)
             except Exception as e:
                 print(f"Timer Loop Error: {e}")
-            
             await asyncio.sleep(60)
 
 # Class instances

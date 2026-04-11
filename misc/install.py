@@ -153,7 +153,8 @@ def main(stdscr):
         "fonts-wqy-microhei",
         "kmscon",
         "cage",
-        "firefox"
+        "firefox",
+        "wlopm"
     ]
     
     package_list = " ".join(packages)
