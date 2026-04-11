@@ -259,6 +259,7 @@ hwaccel
 Description=EduBoard Kiosk (Cage) on TTY2
 After=network.target EduBoard.service seatd.service
 Requires=EduBoard.service seatd.service
+Conflicts=getty@tty2.service
 
 [Service]
 User={username}
@@ -269,10 +270,19 @@ Environment=XDG_RUNTIME_DIR=/run/user/%U
 Environment=WAYLAND_DISPLAY=wayland-0
 Environment=LIBSEAT_BACKEND=seatd
 Environment=WLR_LIBINPUT_NO_DEVICES=1
+
 StandardInput=tty
 StandardOutput=tty
 TTYPath=/dev/tty2
-ExecStart=/bin/bash -c 'until [ "$(curl -s -o /dev/null -w "%%{{http_code}}" http://localhost:8000)" -eq 200 ]; do sleep 1; done; /usr/bin/cage -s -- /usr/bin/firefox-esr --kiosk http://localhost:8000'
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+
+ExecStart=/bin/bash -c '
+    until [ "$(curl -s -o /dev/null -w "%%{{http_code}}" http://localhost:8000)" -eq 200 ]; do sleep 1; done;
+    exec /usr/bin/cage -s -- /usr/bin/firefox-esr --kiosk http://localhost:8000
+'
+
 Restart=always
 RestartSec=5
 
