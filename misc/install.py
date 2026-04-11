@@ -15,13 +15,14 @@ def run_command(command, user=None, cwd=None, env=None, log_callback=None):
     directory = cwd if cwd else "."
     
     if user:
+        # Escape single quotes for the inner command string
         escaped_command = command.replace("'", "'\\''")
         full_command = f"sudo -u {user} -i bash -c '{setup_env} && cd {directory} && {escaped_command}'"
     else:
         full_command = f"bash -c '{setup_env} && {command}'"
 
     if log_callback:
-        log_callback(f"Running: {command}")
+        log_callback(f"Executing: {command}...")
 
     process = subprocess.run(
         full_command, shell=True, executable="/bin/bash",
@@ -29,6 +30,9 @@ def run_command(command, user=None, cwd=None, env=None, log_callback=None):
     )
 
     if process.returncode != 0:
+        # Ignore error if we are trying to add a user that already exists
+        if "adduser" in command and "already exists" in process.stderr:
+            return process
         if log_callback:
             log_callback(f"ERROR: {process.stderr}")
         raise subprocess.CalledProcessError(process.returncode, full_command, output=process.stdout, stderr=process.stderr)
@@ -45,23 +49,34 @@ def write_file(path, content, user=None, mode=0o644):
         os.chown(path, pw.pw_uid, pw.pw_gid)
     os.chmod(path, mode)
 
-def set_hostname(hostname):
-    run_command(f"sudo hostnamectl set-hostname {hostname}")
-    write_file("/etc/hostname", f"{hostname}\n")
-    with open("/etc/hosts", "r") as f:
-        lines = f.readlines()
-    
-    new_lines = [line if '127.0.1.1' not in line else f"127.0.1.1\t{hostname}\n" for line in lines]
-    if not any('127.0.1.1' in line for line in new_lines):
-        new_lines.insert(1, f"127.0.1.1\t{hostname}\n")
-    
-    write_file("/etc/hosts", "".join(new_lines))
+def set_hostname(hostname, log_callback=None):
+    try:
+        run_command(f"sudo hostnamectl set-hostname {hostname}")
+        write_file("/etc/hostname", f"{hostname}\n")
+        with open("/etc/hosts", "r") as f:
+            hosts_content = f.read()
+        
+        lines = hosts_content.split('\n')
+        new_lines = [line if '127.0.1.1' not in line else f"127.0.1.1\t{hostname}" for line in lines]
+        if not any('127.0.1.1' in line for line in new_lines):
+            new_lines.insert(1, f"127.0.1.1\t{hostname}")
+        
+        write_file("/etc/hosts", '\n'.join(new_lines))
+        return True
+    except Exception as e:
+        if log_callback: log_callback(f"Failed hostname: {str(e)}")
+        return False
 
 def main(stdscr):
+    # --- Restore Animations ---
     engine = AnimationEngine(stdscr)
     engine.set_ascii(logo_ascii)
-    engine.log("--- EduBoard KMS Installation ---")
+    engine.animate_ascii_move(duration=3, direction="up")
+    engine.sleep(1)
+    engine.animate_ascii_move(duration=3, direction="out")
+    engine.log("=== EduBoard KMS Unicode Setup ===")
     
+    # --- Config ---
     hostname = engine.ask("Hostname: ", "tv1") or "tv1"
     username = engine.ask("User: ", "kiosk") or "kiosk"
     subdomain = engine.ask("Subdomain: ", "school") or "school"
@@ -72,48 +87,67 @@ def main(stdscr):
     repo_dir = f"{home_dir}/EduBoard"
     venv_dir = f"{home_dir}/venv"
 
-    set_hostname(hostname)
-
+    # --- System Setup ---
+    set_hostname(hostname, engine.log)
+    
+    # Check if user exists before adding
+    user_exists = False
     try:
         pwd.getpwnam(username)
+        user_exists = True
     except KeyError:
-        run_command(f"sudo adduser --disabled-password --gecos '' {username}")
-    
-    run_command(f"sudo usermod -aG video,audio,input,tty,render {username}")
+        pass
 
-    engine.log("Installing Dependencies & KMS Terminal...")
-    run_command("curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -")
-    run_command("sudo apt update")
+    if not user_exists:
+        run_command(f"sudo adduser --disabled-password --gecos '' {username}", log_callback=engine.log)
+    
+    run_command(f"sudo usermod -aG video,audio,input,tty,render {username}", log_callback=engine.log)
+
+    # --- Dependencies & KMSCON ---
+    engine.log("Installing Node 22, KMSCON & Unicode Fonts...")
+    run_command("curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -", log_callback=engine.log)
+    run_command("sudo apt update", log_callback=engine.log)
     
     deps = [
-        "curl", "git", "python3-full", "python3-venv", "nodejs",
-        "kmscon", "fonts-symbola", "fonts-noto-core", "xserver-xorg", "xinit"
+        "curl", "git", "build-essential", "python3-full", "python3-venv", "nodejs",
+        "kmscon", "fonts-symbola", "fonts-noto-core", "fonts-dejavu-core",
+        "xserver-xorg", "xinit"
     ]
-    run_command(f"sudo apt install -y {' '.join(deps)}")
+    run_command(f"sudo apt install -y {' '.join(deps)}", log_callback=engine.log)
 
-    run_command("sudo locale-gen en_US.UTF-8")
-    run_command("sudo update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8")
+    engine.log("Generating Locales...")
+    run_command("sudo locale-gen en_US.UTF-8", log_callback=engine.log)
+    run_command("sudo update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8", log_callback=engine.log)
 
+    # --- App Setup ---
     if not os.path.exists(repo_dir):
-        run_command(f"git clone https://github.com/rawnullbyte/EduBoard.git {repo_dir}", user=username)
+        run_command(f"git clone https://github.com/rawnullbyte/EduBoard.git {repo_dir}", user=username, log_callback=engine.log)
     
     write_file(f"{repo_dir}/.env", f"SCHOOL_SUBDOMAIN={subdomain}\nSCREEN_ID={screen_id}\nPASSWORD={password}\n", user=username)
 
-    run_command(f"python3 -m venv {venv_dir}", user=username)
-    run_command(f"{venv_dir}/bin/pip install --upgrade pip", user=username)
-    run_command(f"{venv_dir}/bin/pip install -r requirements.txt", user=username, cwd=repo_dir)
+    engine.log("Setting up Python Venv...")
+    run_command(f"python3 -m venv {venv_dir}", user=username, log_callback=engine.log)
+    run_command(f"{venv_dir}/bin/pip install --upgrade pip", user=username, log_callback=engine.log)
+    run_command(f"{venv_dir}/bin/pip install -r requirements.txt", user=username, cwd=repo_dir, log_callback=engine.log)
 
-    run_command("npm install && npm run build", user=username, cwd=f"{repo_dir}/frontend")
+    engine.log("Building Frontend...")
+    run_command("npm install && npm run build", user=username, cwd=f"{repo_dir}/frontend", log_callback=engine.log)
 
+    # --- Shell Configuration (The Handover) ---
+    # This runs inside Bash which is launched by kmscon
     bash_profile = f"""
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
+
 if [[ $(tty) == /dev/tty1 ]]; then
     {venv_dir}/bin/python {repo_dir}/misc/boot.py
 fi
 """
     write_file(f"{home_dir}/.bash_profile", bash_profile, user=username)
 
+    # --- KMSCON Service Override ---
+    # This replaces the standard TTY with a Unicode-capable terminal emulator
     kms_override = f"""[Service]
 ExecStart=
 ExecStart=-/usr/bin/kmscon --login --vt vt1 --allow-keyboard --font-name "Monospace" --font-size 14 --autologin {username}
@@ -124,8 +158,8 @@ Environment=LC_ALL=en_US.UTF-8
     write_file("/etc/systemd/system/getty@tty1.service.d/override.conf", kms_override)
 
     engine.log("Finalizing...")
-    run_command("sudo systemctl daemon-reload")
-    run_command("sleep 3 && sudo reboot")
+    run_command("sudo systemctl daemon-reload", log_callback=engine.log)
+    run_command("sleep 3 && sudo reboot", log_callback=engine.log)
 
 if __name__ == "__main__":
     curses.wrapper(main)
