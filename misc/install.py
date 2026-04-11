@@ -250,7 +250,6 @@ Restart=always
 RestartSec=3
 User={username}
 Environment=XDG_RUNTIME_DIR=/run/user/{uid}
-Environment=WAYLAND_DISPLAY=wayland-0
 Environment=MOZ_ENABLE_WAYLAND=1
 UtmpIdentifier=tty2
 UtmpMode=user
