@@ -67,7 +67,9 @@ def set_hostname(hostname, log_callback=None):
 def main(stdscr):
     engine = AnimationEngine(stdscr)
     engine.set_ascii(logo_ascii)
-    engine.animate_ascii_move(duration=2, direction="up")
+    engine.animate_ascii_move(duration=3, direction="up")
+    engine.sleep(1)
+    engine.animate_ascii_move(duration=3, direction="out")
     engine.log("=== EduBoard Setup ===")
     
     # --- Config ---
