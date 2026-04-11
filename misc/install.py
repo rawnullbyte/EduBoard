@@ -278,9 +278,7 @@ TTYReset=yes
 TTYVHangup=yes
 TTYVTDisallocate=yes
 
-ExecStart=/bin/bash -c '
-    until [ "$(curl -s -o /dev/null -w "%%{{http_code}}" http://localhost:8000)" -eq 200 ]; do sleep 1; done;
-    exec /usr/bin/cage -s -- /usr/bin/firefox-esr --kiosk http://localhost:8000
+ExecStart=/bin/bash -c 'until [ "$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000)" -eq 200 ]; do sleep 1; done; exec /usr/bin/cage -s -- /usr/bin/firefox-esr --kiosk http://localhost:8000'
 '
 
 Restart=always
