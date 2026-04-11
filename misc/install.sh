@@ -1,6 +1,8 @@
 #!/bin/bash
 
 echo "--- Updating System and Installing Python ---"
+sudo rm -rf /var/lib/apt/lists/*
+sudo apt clean
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y python3-full python3-pip git build-essential
 
@@ -11,7 +13,9 @@ mkdir -p "$TEMP_DIR"
 cd "$TEMP_DIR" || exit
 
 git init
-git remote add -f origin https://github.com/rawnullbyte/EduBoard.git
+if ! git remote | grep -q "origin"; then
+    git remote add -f origin https://github.com/rawnullbyte/EduBoard.git
+fi
 git config core.sparseCheckout true
 
 echo "requirements.txt" >> .git/info/sparse-checkout
