@@ -224,7 +224,7 @@ hwaccel
     override_dir = "/etc/systemd/system/kmsconvt@tty1.service.d"
     override_content = f"""[Service]
 ExecStart=
-ExecStart=/usr/libexec/kmscon/kmscon --vt=%I --seats=seat0 --configdir /etc/kmscon -- /bin/su -l {username} -c "exec {venv_dir}/bin/python {repo_dir}/misc/boot.py"
+ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/kmscon --term xterm-256color --login -- /bin/su -l {username} -c "exec {venv_dir}/bin/python {repo_dir}/misc/boot.py"
 """
     write_file(f"{override_dir}/override.conf", override_content)
     engine.log(f"✓ Auto-login configured for user '{username}'")
