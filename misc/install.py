@@ -189,6 +189,7 @@ WAYLAND_DISPLAY=wayland-0
         user=username, 
         log_callback=engine.log
     )
+    run_command(f"sudo chown -R {username}:{username} {venv_dir}")
 
     # --- Systemd Service Configuration ---
     engine.log("")
