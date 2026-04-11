@@ -26,9 +26,10 @@ def main(stdscr):
     engine.animate_ascii_move(duration=3, direction="up")
     engine.sleep(1)
     engine.animate_ascii_move(duration=3, direction="out")
-    engine.running = False
 
     tty = os.readlink("/proc/self/fd/0").replace("/dev/", "")
+    engine.log(f"TTY: {tty}")
+    engine.sleep(2)
     if tty == "tty2":
         os.environ["XDG_RUNTIME_DIR"] = f"/run/user/{os.getuid()}"
         os.execv("/usr/bin/cage", ["/usr/bin/cage", "-s", "--", "/usr/bin/firefox-esr", "--kiosk", "http://localhost:8000"])
