@@ -70,7 +70,7 @@ def main(stdscr):
     
     try:
         x_process = subprocess.Popen(
-            ["startx", "--", ":0", "vt2", "-keeptty"],
+            ["startx", "--", ":0", "-keeptty"],
             stdout=subprocess.DEVNULL, 
             stderr=subprocess.DEVNULL
         )
