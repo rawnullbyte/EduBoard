@@ -7,17 +7,23 @@ from logo import text as logo_ascii
 import curses
 
 def run_command(command, user=None, cwd=None, env=None, log_callback=None):
+    # Setup the Python-side environment variables
     custom_env = os.environ.copy()
     custom_env["DEBIAN_FRONTEND"] = "noninteractive"
+    custom_env["TERM"] = "xterm-256color" 
     if env:
         custom_env.update(env)
 
     directory = cwd if cwd else "."
 
+    # Build the shell command
+    # We inject the exports here so that even when switching users via sudo, the environment persists.
+    setup_env = "export TERM=xterm-256color DEBIAN_FRONTEND=noninteractive && "
+    
     if user:
-        full_command = f"sudo -u {user} -i bash -c 'cd {directory} && {command}'"
+        full_command = f"sudo -u {user} -i bash -c '{setup_env} cd {directory} && {command}'"
     else:
-        full_command = command
+        full_command = f"bash -c '{setup_env} {command}'"
 
     if log_callback:
         log_callback(f"Executing: {command}...")
@@ -34,7 +40,12 @@ def run_command(command, user=None, cwd=None, env=None, log_callback=None):
     if process.returncode != 0:
         if log_callback:
             log_callback(f"ERROR: {process.stderr}")
-        raise subprocess.CalledProcessError(process.returncode, full_command, output=process.stdout, stderr=process.stderr)
+        raise subprocess.CalledProcessError(
+            process.returncode, 
+            full_command, 
+            output=process.stdout, 
+            stderr=process.stderr
+        )
     
     return process
 
@@ -156,17 +167,19 @@ def main(stdscr):
         run_command("npm run build", user=username, cwd=frontend_dir)
 
     # --- Config Files ---
-    engine.log("Configuring boot and desktop environment...")
+    engine.log("Configuring boot environment...")
     
-    # .bash_profile
-    bash_profile = f"if [[ -z $DISPLAY && $(tty) = /dev/tty1 ]]; then\n    {venv_dir}/bin/python {repo_dir}/misc/boot.py\nfi\n"
+    bash_profile = f"""
+export TERM=xterm-256color
+if [[ -z $DISPLAY && $(tty) = /dev/tty1 ]]; then
+    {venv_dir}/bin/python {repo_dir}/misc/boot.py
+fi
+"""
     write_file(f"{home_dir}/.bash_profile", bash_profile, user=username)
 
-    # .xinitrc
     xinitrc = "xset +dpms\nxset dpms 0 0 0\nxset s off\nxset s noblank\nunclutter -idle 1 &\nexec openbox-session\n"
     write_file(f"{home_dir}/.xinitrc", xinitrc, user=username)
 
-    # Openbox Autostart
     openbox_dir = f"{home_dir}/.config/openbox"
     autostart = "firefox --kiosk --no-remote http://localhost:8000\n"
     write_file(f"{openbox_dir}/autostart", autostart, user=username)
@@ -174,7 +187,10 @@ def main(stdscr):
     # --- Systemd Overrides & Services ---
     engine.log("Setting up system services...")
     getty_dir = "/etc/systemd/system/getty@tty1.service.d"
-    getty_conf = f"[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin {username} --noclear %I $TERM\n"
+    getty_conf = f"""[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin {username} --noclear %I xterm-256color
+"""
     os.makedirs(getty_dir, exist_ok=True)
     write_file(f"{getty_dir}/override.conf", getty_conf)
 
@@ -187,6 +203,7 @@ User={username}
 WorkingDirectory={repo_dir}
 ExecStart=/bin/bash {repo_dir}/run.sh {venv_dir}
 Restart=always
+Environment=TERM=xterm-256color
 EnvironmentFile={repo_dir}/.env
 
 [Install]
