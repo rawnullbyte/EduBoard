@@ -225,6 +225,33 @@ DISPLAY=:0
         log_callback=engine.log
     )
 
+    # --- Systemd Service Configuration ---
+    engine.log("")
+    engine.log("→ Creating EduBoard systemd service...")
+    
+    service_content = f"""[Unit]
+Description=EduBoard Background Service
+After=network.target
+
+[Service]
+Type=simple
+User={username}
+Group={username}
+WorkingDirectory={repo_dir}
+ExecStart={repo_dir}/run.sh
+Restart=always
+RestartSec=3
+Environment="PATH={venv_dir}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment=PYTHONUNBUFFERED=1
+Environment=DISPLAY=:0
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+    write_file("/etc/systemd/system/EduBoard.service", service_content)
+    engine.log("✓ EduBoard service created!")
+
     # --- X11 Config ---
     engine.log("")
     engine.log("→ Configuring X11 permissions...")
@@ -279,10 +306,11 @@ ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/km
     engine.log("")
     engine.log("→ Finalizing installation...")
     run_command("sudo systemctl daemon-reload")
+    run_command("sudo systemctl enable EduBoard.service", log_callback=engine.log)
     
     engine.log("")
     engine.log("╔══════════════════════════════════════╗")
-    engine.log("║       Installation Complete!          ║")
+    engine.log("║       Installation Complete!         ║")
     engine.log("╚══════════════════════════════════════╝")
     engine.log("")
     engine.log("System will reboot in 3 seconds...")
