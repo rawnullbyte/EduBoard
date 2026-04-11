@@ -247,6 +247,8 @@ class ScreenManager():
             print(f"Error controlling screen: {e}")
 
     async def screen_timer_loop(self):
+        self.set_screen(True)
+        await asyncio.sleep(60)
         while True:
             try:
                 tt_data = self.edub.fetchTimetableData()

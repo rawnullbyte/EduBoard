@@ -232,23 +232,27 @@ WantedBy=multi-user.target
     
     cage_service_content = f"""[Unit]
 Description=Cage Wayland compositor on tty2
-After=systemd-user-sessions.service plymouth-quit-wait.service dbus.socket systemd-logind.service EduBoard.service
+After=systemd-user-sessions.service plymouth-quit-wait.service dbus.socket systemd-logind.service EduBoard.service dev-dri-card0.device
 Before=graphical.target
 ConditionPathExists=/dev/tty0
-Wants=dbus.socket systemd-logind.service
+Wants=dbus.socket systemd-logind.service dev-dri-card0.device
 Conflicts=getty@tty2.service
 After=getty@tty2.service
 
 [Service]
 Type=simple
+ExecStartPre=/bin/sleep 3
 ExecStartPre=/bin/mkdir -p /run/user/{uid}
 ExecStartPre=/bin/chown {username}:{username} /run/user/{uid}
 ExecStartPre=/bin/chmod 700 /run/user/{uid}
+ExecStartPre=+/usr/bin/wlopm --on "*"
 ExecStart=/usr/bin/cage -s -- /usr/bin/firefox --kiosk http://localhost:8000
 ExecStartPost=+sh -c "chvt 2"
 Restart=always
+RestartSec=3
 User={username}
 Environment=XDG_RUNTIME_DIR=/run/user/{uid}
+Environment=WAYLAND_DISPLAY=wayland-0
 Environment=MOZ_ENABLE_WAYLAND=1
 UtmpIdentifier=tty2
 UtmpMode=user
