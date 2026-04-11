@@ -122,16 +122,6 @@ def main(stdscr):
         run_command(f"echo '{username} ALL=(ALL) NOPASSWD: /usr/bin/chvt' | sudo tee /etc/sudoers.d/kiosk-chvt")
         engine.log(f"✓ Created user '{username}'")
     
-    # Get user UID for later use
-    uid_result = run_command(f"id -u {username}")
-    uid = uid_result.stdout.strip()
-    
-    run_command(
-        f"sudo usermod -aG video,audio,input,tty,render,sudo {username}", 
-        log_callback=engine.log
-    )
-    engine.log(f"✓ Added user to required groups")
-
     # --- Package Dependencies ---
     engine.log("")
     engine.log("→ Installing system dependencies...")
@@ -163,6 +153,12 @@ def main(stdscr):
     engine.log(f"  Installing dependencies... (This may take a while!)")
     run_command(f"sudo apt install -y {package_list}", log_callback=engine.log)
     engine.log("✓ Dependencies installed")
+
+    run_command(
+        f"sudo usermod -aG video,audio,input,tty,render,sudo,seat {username}", 
+        log_callback=engine.log
+    )
+    engine.log(f"✓ Added user to required groups")
 
     # --- Fastfetch ---
     engine.log("→ Installing fastfetch...")
