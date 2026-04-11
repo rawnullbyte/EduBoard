@@ -7,8 +7,7 @@ from logo import text as logo_ascii
 import curses
 import pwd
 
-def run_command(command, user=None, cwd=None, env=None, log_callback=None):
-    """Execute a shell command with optional user context and working directory."""
+def run_command(command, user=None, cwd=None, log_callback=None):
     custom_env = os.environ.copy()
     custom_env.update({
         "DEBIAN_FRONTEND": "noninteractive",
@@ -22,9 +21,9 @@ def run_command(command, user=None, cwd=None, env=None, log_callback=None):
     
     if user:
         escaped_command = command.replace("'", "'\\''")
-        full_command = f"sudo -u {user} -i bash -c '{setup_env} cd {directory} && {escaped_command}'"
+        full_command = f"sudo -u {user} -i {setup_env} cd {directory} && {escaped_command}"
     else:
-        full_command = f"bash -c '{setup_env} {command}'"
+        full_command = f"{setup_env} {command}"
 
     if log_callback:
         log_callback(f"→ {command}")
@@ -44,7 +43,6 @@ def run_command(command, user=None, cwd=None, env=None, log_callback=None):
         )
     
     if log_callback and process.stdout:
-        # Only log stdout if there's something meaningful and not too verbose
         output = process.stdout.strip()
         if output and len(output) < 200:
             log_callback(f"  {output}")
@@ -52,7 +50,6 @@ def run_command(command, user=None, cwd=None, env=None, log_callback=None):
     return process
 
 def write_file(path, content, user=None, mode=0o644):
-    """Write content to a file with proper ownership and permissions."""
     path = Path(path)
     run_command(f"sudo mkdir -p {path.parent}")
     temp_path = f"/tmp/{path.name}.tmp"
@@ -68,7 +65,6 @@ def write_file(path, content, user=None, mode=0o644):
     run_command(f"sudo chmod {mode:o} {path}")
 
 def set_hostname(hostname, log_callback=None):
-    """Set system hostname and update hosts file."""
     try:
         if log_callback:
             log_callback(f"→ Setting hostname to '{hostname}'")
@@ -147,7 +143,7 @@ def main(stdscr):
     
     packages = [
         "curl",
-        "git", 
+        "git",
         "python3-full",
         "python3-venv",
         "nodejs",
@@ -158,7 +154,6 @@ def main(stdscr):
         "fonts-wqy-microhei"
     ]
     
-    # Format package list like apt install output
     package_list = " ".join(packages)
     engine.log(f"  Installing: {package_list}")
     run_command(f"sudo apt install -y {package_list}", log_callback=engine.log)
@@ -228,7 +223,7 @@ hwaccel
     override_dir = "/etc/systemd/system/kmsconvt@tty1.service.d"
     override_content = f"""[Service]
 ExecStart=
-ExecStart=/usr/libexec/kmscon/kmscon --vt=%I --seats=seat0 --configdir /etc/kmscon --login -- /bin/login -f {username}
+ExecStart=/usr/libexec/kmscon/kmscon --vt=%I --seats=seat0 --configdir /etc/kmscon --login -- /bin/login -p -f {username} {venv_dir}/bin/python {repo_dir}/misc/boot.py
 """
     write_file(f"{override_dir}/override.conf", override_content)
     engine.log(f"✓ Auto-login configured for user '{username}'")
