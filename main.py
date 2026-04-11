@@ -238,8 +238,8 @@ class ScreenManager():
     def set_screen(self, state: bool):
         cmd = "on" if state else "off"
         try:
-            subprocess.run(["wlopm", f"--{cmd}", "*"], check=True)
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] wlopm --{cmd} '*'")
+            subprocess.run(["xset", f"dpms", "force", cmd], check=True)
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] xset dpms force {cmd}")
         except Exception as e:
             print(f"Error controlling screen: {e}")
 
