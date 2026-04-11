@@ -105,7 +105,7 @@ After=network.target
 [Service]
 User=$USERNAME
 WorkingDirectory=/home/$USERNAME/EduBoard
-ExecStart=/home/$USERNAME/venv/bin/python /home/$USERNAME/EduBoard/main.py
+ExecStart=/bin/bash /home/$USERNAME/EduBoard/run.sh /home/$USERNAME/venv
 Restart=always
 EnvironmentFile=/home/$USERNAME/EduBoard/.env
 
