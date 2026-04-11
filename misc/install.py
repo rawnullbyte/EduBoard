@@ -233,10 +233,10 @@ WantedBy=multi-user.target
     
     cage_service_content = f"""[Unit]
 Description=Cage Wayland compositor on tty2
-After=systemd-user-sessions.service plymouth-quit-wait.service dbus.socket systemd-logind.service EduBoard.service dev-dri-card0.device
+After=systemd-user-sessions.service plymouth-quit-wait.service dbus.socket systemd-logind.service EduBoard.service
 Before=graphical.target
 ConditionPathExists=/dev/tty0
-Wants=dbus.socket systemd-logind.service dev-dri-card0.device
+Wants=dbus.socket systemd-logind.service
 Conflicts=getty@tty2.service
 After=getty@tty2.service
 
