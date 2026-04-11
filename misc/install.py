@@ -139,6 +139,7 @@ def main(stdscr):
         "curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -", 
         log_callback=engine.log
     )
+    run_command("sudo add-apt-repository -y ppa:mozillateam/ppa", log_callback=engine.log)
     run_command("sudo apt update", log_callback=engine.log)
     
     packages = [
@@ -153,7 +154,7 @@ def main(stdscr):
         "fonts-wqy-microhei",
         "kmscon",
         "cage",
-        "firefox",
+        "firefox-esr",
         "wlopm"
     ]
     
@@ -241,13 +242,10 @@ After=getty@tty2.service
 
 [Service]
 Type=simple
-ExecStartPre=/bin/sleep 3
 ExecStartPre=/bin/mkdir -p /run/user/{uid}
 ExecStartPre=/bin/chown {username}:{username} /run/user/{uid}
 ExecStartPre=/bin/chmod 700 /run/user/{uid}
-ExecStartPre=+/usr/bin/wlopm --on "*"
-ExecStart=/usr/bin/cage -s -- /usr/bin/firefox --kiosk http://localhost:8000
-ExecStartPost=+sh -c "chvt 2"
+ExecStart=/usr/bin/cage -s -- /usr/bin/firefox-esr --kiosk http://localhost:8000
 Restart=always
 RestartSec=3
 User={username}
