@@ -13,7 +13,8 @@ def run_command(command, user=None, cwd=None, log_callback=None):
         "DEBIAN_FRONTEND": "noninteractive",
         "TERM": "xterm-256color",
         "LANG": "en_US.UTF-8",
-        "LC_ALL": "en_US.UTF-8"
+        "LC_ALL": "en_US.UTF-8",
+        "WAYLAND_DISPLAY": "wayland-0"
     })
     
     directory = cwd if cwd else "."
@@ -23,9 +24,6 @@ def run_command(command, user=None, cwd=None, log_callback=None):
         full_command = f"sudo -u {user} -i cd {directory} && {escaped_command}"
     else:
         full_command = command
-
-    # if log_callback:
-    #     log_callback(f"→ {command}")
 
     process = subprocess.run(
         full_command, shell=True, executable="/bin/bash",
@@ -124,6 +122,10 @@ def main(stdscr):
         run_command(f"echo '{username}:{password}' | sudo chpasswd")
         engine.log(f"✓ Created user '{username}'")
     
+    # Get user UID for later use
+    uid_result = run_command(f"id -u {username}")
+    uid = uid_result.stdout.strip()
+    
     run_command(
         f"sudo usermod -aG video,audio,input,tty,render,sudo {username}", 
         log_callback=engine.log
@@ -150,50 +152,14 @@ def main(stdscr):
         "fonts-dejavu",
         "fonts-wqy-microhei",
         "kmscon",
-        "xorg",
-        "openbox",
-        "xinit",
-        "x11-xserver-utils",
-        "unclutter",
-        "firefox"
+        "cage",
+        "firefox-esr"
     ]
     
     package_list = " ".join(packages)
     engine.log(f"  Installing dependencies... (This may take a while!)")
     run_command(f"sudo apt install -y {package_list}", log_callback=engine.log)
     engine.log("✓ Dependencies installed")
-
-    # --- Disable screensaver ---
-    engine.log("")
-    engine.log("→ Disabling screensaver (DPMS remains enabled)...")
-    
-    xorg_conf_content = '''Section "ServerFlags"
-    Option "BlankTime" "0"
-    Option "StandbyTime" "0"
-    Option "SuspendTime" "0"
-    Option "OffTime" "0"
-EndSection
-'''
-    write_file("/etc/X11/xorg.conf.d/10-disable-blanking.conf", xorg_conf_content)
-    
-    run_command("sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target")
-    engine.log("✓ Screensaver disabled, DPMS remains active")
-
-    # --- OpenBox Minimal Config ---
-    engine.log("")
-    engine.log("→ Configuring minimal OpenBox...")
-    
-    openbox_autostart_content = '''#!/bin/bash
-xset s off
-unclutter -idle 1 -root &
-firefox --kiosk http://localhost:8000
-'''
-    
-    openbox_dir = f"{home_dir}/.config/openbox"
-    run_command(f"sudo -u {username} mkdir -p {openbox_dir}")
-    write_file(f"{openbox_dir}/autostart", openbox_autostart_content, user=username, mode=0o755)
-    
-    engine.log("✓ OpenBox configured")
 
     # --- Application Setup ---
     engine.log("")
@@ -212,7 +178,7 @@ firefox --kiosk http://localhost:8000
     env_content = f"""SCHOOL_SUBDOMAIN={subdomain}
 SCREEN_ID={screen_id}
 PASSWORD={password}
-DISPLAY=:0
+WAYLAND_DISPLAY=wayland-0
 """
     write_file(f"{repo_dir}/.env", env_content, user=username)
     engine.log("✓ Environment configuration written")
@@ -242,7 +208,8 @@ Restart=always
 RestartSec=3
 Environment="PATH={venv_dir}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 Environment=PYTHONUNBUFFERED=1
-Environment=DISPLAY=:0
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=XDG_RUNTIME_DIR=/run/user/{uid}
 
 [Install]
 WantedBy=multi-user.target
@@ -251,26 +218,42 @@ WantedBy=multi-user.target
     write_file("/etc/systemd/system/EduBoard.service", service_content)
     engine.log("✓ EduBoard service created!")
 
-    # --- X11 Config ---
+    # --- Cage Auto-start Service ---
     engine.log("")
-    engine.log("→ Configuring X11 permissions...")
-    xwrapper_content = """allowed_users=anybody
-    needs_root_rights=yes
-    """
-    write_file("/etc/X11/Xwrapper.config", xwrapper_content)
-    engine.log("✓ X11 configuration written")
+    engine.log("→ Creating Cage auto-start service...")
     
-    # --- X11 Auto-start ---
-    engine.log("→ Configuring auto-login...")
-    
-    xinitrc_content = '''#!/bin/bash
-xset s off
-exec openbox-session
-'''
-    write_file(f"{home_dir}/.xinitrc", xinitrc_content, user=username, mode=0o755)
-    
+    cage_service_content = f"""[Unit]
+Description=Cage Wayland Kiosk
+After=systemd-user-sessions.service EduBoard.service
 
-   # --- KMSCON Terminal Configuration ---
+[Service]
+User={username}
+Group={username}
+PAMName=login
+Type=simple
+ExecStartPre=/bin/mkdir -p /run/user/{uid}
+ExecStartPre=/bin/chown {username}:{username} /run/user/{uid}
+ExecStartPre=/bin/chmod 700 /run/user/{uid}
+Environment=XDG_RUNTIME_DIR=/run/user/{uid}
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=MOZ_ENABLE_WAYLAND=1
+ExecStart=/usr/bin/cage -s -- /usr/bin/firefox-esr --kiosk http://localhost:8000
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+TTYPath=/dev/tty2
+StandardInput=tty
+TTYVTDisallocate=yes
+
+[Install]
+WantedBy=graphical.target
+"""
+
+    write_file("/etc/systemd/system/cage-kiosk.service", cage_service_content)
+    engine.log("✓ Cage auto-start service created")
+
+    # --- KMSCON Terminal Configuration ---
     engine.log("")
     engine.log("→ Configuring KMSCON terminal...")
     
@@ -282,14 +265,14 @@ hwaccel
     write_file("/etc/kmscon/kmscon.conf", kmscon_conf_content)
     engine.log("✓ KMSCON configuration written")
 
-    # Systemd override for auto-login
+    # Systemd override for auto-login (boot.py runs on tty1, shows splash then exits)
     override_dir = "/etc/systemd/system/kmsconvt@tty1.service.d"
     override_content = f"""[Service]
 ExecStart=
 ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/kmscon --term xterm-256color --login -- /bin/su -l {username} -c "exec {venv_dir}/bin/python {repo_dir}/misc/boot.py"
 """
     write_file(f"{override_dir}/override.conf", override_content)
-    engine.log(f"✓ Auto-login configured for user '{username}'")
+    engine.log(f"✓ Auto-login configured for user '{username}' on tty1")
 
     # Disable conflicting services
     engine.log("  Disabling conflicting terminal services...")
@@ -297,9 +280,10 @@ ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/km
     run_command("sudo systemctl mask serial-getty@ttyS0.service")
     run_command("sudo systemctl mask serial-getty@hvc0.service")
     
-    # Enable KMSCON
+    # Enable KMSCON and Cage services
     run_command("sudo systemctl enable kmsconvt@tty1.service", log_callback=engine.log)
-    engine.log("✓ KMSCON service enabled")
+    run_command("sudo systemctl enable cage-kiosk.service", log_callback=engine.log)
+    engine.log("✓ KMSCON and Cage services enabled")
 
     # --- Final Setup ---
     engine.log("")
@@ -311,6 +295,11 @@ ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/km
     engine.log("╔══════════════════════════════════════╗")
     engine.log("║       Installation Complete!         ║")
     engine.log("╚══════════════════════════════════════╝")
+    engine.log("")
+    engine.log("Architecture:")
+    engine.log("  • tty1: KMSCON → boot.py (splash/debug, then exits)")
+    engine.log("  • tty2: Cage → Firefox (kiosk)")
+    engine.log("  • bg:   EduBoard.service (backend)")
     engine.log("")
     engine.log("System will reboot in 3 seconds...")
     
