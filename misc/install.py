@@ -204,7 +204,7 @@ Type=simple
 User={username}
 Group={username}
 WorkingDirectory={repo_dir}
-ExecStart={repo_dir}/run.sh
+ExecStart=/bin/bash -c "source {venv_dir}/bin/activate && {repo_dir}/run.sh"
 Restart=always
 RestartSec=3
 Environment="PATH={venv_dir}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"

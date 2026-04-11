@@ -35,7 +35,6 @@ class EduBoard:
             headers=self.headers
         )
 
-        print(r.text)
         self.cookies["nb_pwd_hash"] = r.json().get("r").get("cookie")
         self.fetchMainDBI()
     

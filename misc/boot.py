@@ -9,12 +9,13 @@ import curses
 def main(stdscr):
     engine = AnimationEngine(stdscr)
     engine.set_ascii(logo_ascii)
+    engine.animate_ascii_move(duration=3, direction="up")
+    engine.sleep(1)
+    engine.animate_ascii_move(duration=3, direction="out")
+    subprocess.run(["chvt", "2"])
 
     while True:
-        engine.animate_ascii_move(duration=3, direction="up")
-        engine.sleep(1)
-        engine.animate_ascii_move(duration=3, direction="out")
-
+        pass
 
 if __name__ == "__main__":
     curses.wrapper(main)
