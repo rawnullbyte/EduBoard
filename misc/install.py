@@ -19,26 +19,19 @@ def run_command(command, user=None, cwd=None, env=None, log_callback=None):
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-        bufsize=1  # Line buffered
+        bufsize=1
     )
 
-    try:
-        while True:
-            line = process.stdout.readline()
-            if not line and process.poll() is not None:
-                break
-            if line and log_callback:
-                log_callback(line.strip())
-    finally:
-        process.stdout.close()
-        return_code = process.wait()
-
-    if return_code != 0:
-        if return_code == -13 or return_code == 141:
-            if log_callback:
-                log_callback("Note: Pipe closed (SIGPIPE), but command likely finished.")
-            return process
+    while True:
+        line = process.stdout.readline()
+        if not line and process.poll() is not None:
+            break
+        
+        if line and log_callback:
+            log_callback(line.strip())
             
+    return_code = process.wait()
+    if return_code != 0:
         raise subprocess.CalledProcessError(return_code, command)
     
     return process
