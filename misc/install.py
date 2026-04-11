@@ -155,6 +155,10 @@ def main(stdscr):
     engine.log("✓ Dependencies installed")
 
     run_command(
+        "sudo groupadd -r seat",
+        log_callback=engine.log
+    )
+    run_command(
         f"sudo usermod -aG video,audio,input,tty,render,sudo,seat {username}", 
         log_callback=engine.log
     )
