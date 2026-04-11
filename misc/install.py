@@ -159,7 +159,7 @@ def main(stdscr):
     ]
     
     package_list = " ".join(packages)
-    engine.log(f"  Installing dependencies... (This may take some time!)")
+    engine.log(f"  Installing dependencies... (This may take a while!)")
     run_command(f"sudo apt install -y {package_list}", log_callback=engine.log)
     engine.log("✓ Dependencies installed")
 
@@ -225,24 +225,6 @@ DISPLAY=:0
         log_callback=engine.log
     )
     
-    engine.log("  Installing Python dependencies...")
-    run_command(
-        f"{venv_dir}/bin/pip install -r requirements.txt", 
-        user=username, 
-        cwd=repo_dir, 
-        log_callback=engine.log
-    )
-    engine.log("✓ Python dependencies installed")
-    
-    engine.log("  Building frontend assets...")
-    run_command(
-        "npm install && npm run build", 
-        user=username, 
-        cwd=f"{repo_dir}/frontend", 
-        log_callback=engine.log
-    )
-    engine.log("✓ Frontend built successfully")
-
     # --- X11 Auto-start ---
     engine.log("")
     engine.log("→ Configuring auto-login...")
