@@ -223,34 +223,49 @@ WantedBy=multi-user.target
     engine.log("→ Creating Cage auto-start service...")
     
     cage_service_content = f"""[Unit]
-Description=Cage Wayland Kiosk
-After=systemd-user-sessions.service EduBoard.service
+Description=Cage Wayland compositor on tty2
+After=systemd-user-sessions.service plymouth-quit-wait.service dbus.socket systemd-logind.service EduBoard.service
+Before=graphical.target
+ConditionPathExists=/dev/tty0
+Wants=dbus.socket systemd-logind.service
+Conflicts=getty@tty2.service
+After=getty@tty2.service
 
 [Service]
-User={username}
-Group={username}
-PAMName=login
 Type=simple
 ExecStartPre=/bin/mkdir -p /run/user/{uid}
 ExecStartPre=/bin/chown {username}:{username} /run/user/{uid}
 ExecStartPre=/bin/chmod 700 /run/user/{uid}
-Environment=XDG_RUNTIME_DIR=/run/user/{uid}
-Environment=WAYLAND_DISPLAY=wayland-0
-Environment=MOZ_ENABLE_WAYLAND=1
 ExecStart=/usr/bin/cage -s -- /usr/bin/firefox --kiosk http://localhost:8000
+ExecStartPost=+sh -c "chvt 2"
 Restart=always
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
+User={username}
+Environment=XDG_RUNTIME_DIR=/run/user/{uid}
+Environment=MOZ_ENABLE_WAYLAND=1
+UtmpIdentifier=tty2
+UtmpMode=user
 TTYPath=/dev/tty2
-StandardInput=tty
+TTYReset=yes
+TTYVHangup=yes
 TTYVTDisallocate=yes
+StandardInput=tty-fail
+PAMName=cage
 
 [Install]
 WantedBy=graphical.target
 """
 
     write_file("/etc/systemd/system/cage-kiosk.service", cage_service_content)
+
+    pam_cage_content = """#%PAM-1.0
+auth       required   pam_unix.so
+account    required   pam_unix.so
+session    required   pam_unix.so
+session    optional   pam_systemd.so
+"""
+    write_file("/etc/pam.d/cage", pam_cage_content)
+    engine.log("✓ PAM cage config written")
+
     engine.log("✓ Cage auto-start service created")
 
     # --- KMSCON Terminal Configuration ---
