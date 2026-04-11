@@ -2,27 +2,26 @@ import subprocess
 import os
 import shutil
 from pathlib import Path
+import curses
+import pwd
 from aengine import AnimationEngine
 from logo import text as logo_ascii
-import curses
 
 def run_command(command, user=None, cwd=None, env=None, log_callback=None):
     custom_env = os.environ.copy()
     custom_env["DEBIAN_FRONTEND"] = "noninteractive"
-    custom_env["TERM"] = "xterm-256color" 
-    if env:
-        custom_env.update(env)
-
+    
+    setup_env = "export DEBIAN_FRONTEND=noninteractive LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8"
     directory = cwd if cwd else "."
-    setup_env = "export TERM=xterm-256color DEBIAN_FRONTEND=noninteractive && "
     
     if user:
-        full_command = f"sudo -u {user} -i bash -c '{setup_env} cd {directory} && {command}'"
+        escaped_command = command.replace("'", "'\\''")
+        full_command = f"sudo -u {user} -i bash -c '{setup_env} && cd {directory} && {escaped_command}'"
     else:
-        full_command = f"bash -c '{setup_env} {command}'"
+        full_command = f"bash -c '{setup_env} && {command}'"
 
     if log_callback:
-        log_callback(f"Executing: {command}...")
+        log_callback(f"Running: {command}")
 
     process = subprocess.run(
         full_command, shell=True, executable="/bin/bash",
@@ -34,9 +33,6 @@ def run_command(command, user=None, cwd=None, env=None, log_callback=None):
             log_callback(f"ERROR: {process.stderr}")
         raise subprocess.CalledProcessError(process.returncode, full_command, output=process.stdout, stderr=process.stderr)
     
-    if log_callback:
-        log_callback(f"OUTPUT: {process.stdout}")
-
     return process
 
 def write_file(path, content, user=None, mode=0o644):
@@ -45,122 +41,91 @@ def write_file(path, content, user=None, mode=0o644):
     with open(path, "w") as f:
         f.write(content)
     if user:
-        shutil.chown(path, user=user, group=user)
+        pw = pwd.getpwnam(user)
+        os.chown(path, pw.pw_uid, pw.pw_gid)
     os.chmod(path, mode)
 
-def set_hostname(hostname, log_callback=None):
-    try:
-        run_command(f"sudo hostnamectl set-hostname {hostname}")
-        write_file("/etc/hostname", f"{hostname}\n")
-        with open("/etc/hosts", "r") as f:
-            hosts_content = f.read()
-        
-        lines = hosts_content.split('\n')
-        new_lines = [line if '127.0.1.1' not in line else f"127.0.1.1\t{hostname}" for line in lines]
-        if not any('127.0.1.1' in line for line in new_lines):
-            new_lines.insert(1, f"127.0.1.1\t{hostname}")
-        
-        write_file("/etc/hosts", '\n'.join(new_lines))
-        return True
-    except Exception as e:
-        if log_callback: log_callback(f"Failed hostname: {str(e)}")
-        return False
+def set_hostname(hostname):
+    run_command(f"sudo hostnamectl set-hostname {hostname}")
+    write_file("/etc/hostname", f"{hostname}\n")
+    with open("/etc/hosts", "r") as f:
+        lines = f.readlines()
+    
+    new_lines = [line if '127.0.1.1' not in line else f"127.0.1.1\t{hostname}\n" for line in lines]
+    if not any('127.0.1.1' in line for line in new_lines):
+        new_lines.insert(1, f"127.0.1.1\t{hostname}\n")
+    
+    write_file("/etc/hosts", "".join(new_lines))
 
 def main(stdscr):
     engine = AnimationEngine(stdscr)
     engine.set_ascii(logo_ascii)
-    engine.animate_ascii_move(duration=3, direction="up")
-    engine.sleep(1)
-    engine.animate_ascii_move(duration=3, direction="out")
-    engine.log("=== EduBoard Setup ===")
+    engine.log("--- EduBoard KMS Installation ---")
     
-    # --- Config ---
     hostname = engine.ask("Hostname: ", "tv1") or "tv1"
     username = engine.ask("User: ", "kiosk") or "kiosk"
     subdomain = engine.ask("Subdomain: ", "school") or "school"
     screen_id = engine.ask("Screen ID: ", "1") or "1"
     password = engine.ask("Password: ", "123456") or "123456"
 
-    home_dir, repo_dir, venv_dir = f"/home/{username}", f"/home/{username}/EduBoard", f"/home/{username}/venv"
+    home_dir = f"/home/{username}"
+    repo_dir = f"{home_dir}/EduBoard"
+    venv_dir = f"{home_dir}/venv"
 
-    # --- System Setup ---
-    set_hostname(hostname, engine.log)
+    set_hostname(hostname)
+
     try:
-        subprocess.run(["id", username], check=True, capture_output=True)
-    except subprocess.CalledProcessError:
-        run_command(f"sudo adduser --disabled-password --gecos '' {username}", log_callback=engine.log)
+        pwd.getpwnam(username)
+    except KeyError:
+        run_command(f"sudo adduser --disabled-password --gecos '' {username}")
     
-    run_command(f"sudo usermod -aG video,audio,input,tty,render {username}", log_callback=engine.log)
+    run_command(f"sudo usermod -aG video,audio,input,tty,render {username}")
 
-    # --- Dependencies & Node 22 ---
-    engine.log("Installing Node 22 and Dependencies...")
-    run_command("curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -", log_callback=engine.log)
-    run_command("sudo apt update", log_callback=engine.log)
+    engine.log("Installing Dependencies & KMS Terminal...")
+    run_command("curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -")
+    run_command("sudo apt update")
+    
     deps = [
-        "curl", "git", "build-essential", "python3-full", "python3-venv", "nodejs",
-        "xserver-xorg", "xinit", "openbox", "firefox", "fbterm", "fonts-terminus",
-        "fonts-noto-core", "fonts-dejavu-core"
+        "curl", "git", "python3-full", "python3-venv", "nodejs",
+        "kmscon", "fonts-symbola", "fonts-noto-core", "xserver-xorg", "xinit"
     ]
-    run_command(f"sudo apt install -y {' '.join(deps)}", log_callback=engine.log)
+    run_command(f"sudo apt install -y {' '.join(deps)}")
 
-    engine.log("Granting fbterm TTY permissions...")
-    run_command("sudo setcap 'cap_sys_tty_config+ep' /usr/bin/fbterm", log_callback=engine.log)
+    run_command("sudo locale-gen en_US.UTF-8")
+    run_command("sudo update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8")
 
-    engine.log("Generating Locales...")
-    run_command("sudo locale-gen en_US.UTF-8", log_callback=engine.log)
-    run_command("sudo update-locale LANG=en_US.UTF-8", log_callback=engine.log)
-
-    # --- App Setup ---
     if not os.path.exists(repo_dir):
-        run_command(f"git clone https://github.com/rawnullbyte/EduBoard.git {repo_dir}", user=username, log_callback=engine.log)
+        run_command(f"git clone https://github.com/rawnullbyte/EduBoard.git {repo_dir}", user=username)
     
     write_file(f"{repo_dir}/.env", f"SCHOOL_SUBDOMAIN={subdomain}\nSCREEN_ID={screen_id}\nPASSWORD={password}\n", user=username)
 
-    engine.log("Setting up Python Venv...")
-    run_command(f"python3 -m venv {venv_dir}", user=username, log_callback=engine.log)
-    run_command(f"{venv_dir}/bin/pip install --upgrade pip", user=username, log_callback=engine.log)
-    run_command(f"{venv_dir}/bin/pip install -r requirements.txt", user=username, cwd=repo_dir, log_callback=engine.log)
+    run_command(f"python3 -m venv {venv_dir}", user=username)
+    run_command(f"{venv_dir}/bin/pip install --upgrade pip", user=username)
+    run_command(f"{venv_dir}/bin/pip install -r requirements.txt", user=username, cwd=repo_dir)
 
-    engine.log("Building Frontend...")
-    run_command("npm install && npm run build", user=username, cwd=f"{repo_dir}/frontend", log_callback=engine.log)
+    run_command("npm install && npm run build", user=username, cwd=f"{repo_dir}/frontend")
 
-    # --- Config Files ---
     bash_profile = f"""
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
-export LANGUAGE=en_US.UTF-8
-
-if [[ $(tty) == /dev/tty1 && -z "$FBTERM_TTY" ]]; then
-    exec fbterm -s 14 -- {venv_dir}/bin/python {repo_dir}/misc/boot.py
+if [[ $(tty) == /dev/tty1 ]]; then
+    {venv_dir}/bin/python {repo_dir}/misc/boot.py
 fi
 """
     write_file(f"{home_dir}/.bash_profile", bash_profile, user=username)
 
-    # Autostart / Xinit
-    write_file(f"{home_dir}/.xinitrc", "exec openbox-session\n", user=username)
-    os.makedirs(f"{home_dir}/.config/openbox", exist_ok=True)
-    write_file(f"{home_dir}/.config/openbox/autostart", "firefox --kiosk http://localhost:8000\n", user=username)
-
-    # --- Services ---
-    write_file("/etc/systemd/system/getty@tty1.service.d/override.conf", f"[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin {username} --noclear %I xterm-256color\n")
-    
-    service = f"""[Unit]
-Description=EduBoard
-After=network.target
-[Service]
-User={username}
-WorkingDirectory={repo_dir}
-ExecStart=/bin/bash {repo_dir}/run.sh {venv_dir}
-Restart=always
-Environment=TERM=xterm-256color
-EnvironmentFile={repo_dir}/.env
-[Install]
-WantedBy=multi-user.target"""
-    write_file("/etc/systemd/system/eduboard.service", service)
+    kms_override = f"""[Service]
+ExecStart=
+ExecStart=-/usr/bin/kmscon --login --vt vt1 --allow-keyboard --font-name "Monospace" --font-size 14 --autologin {username}
+Environment=LANG=en_US.UTF-8
+Environment=LC_ALL=en_US.UTF-8
+"""
+    os.makedirs("/etc/systemd/system/getty@tty1.service.d", exist_ok=True)
+    write_file("/etc/systemd/system/getty@tty1.service.d/override.conf", kms_override)
 
     engine.log("Finalizing...")
-    run_command("sudo systemctl daemon-reload && sudo systemctl enable eduboard.service", log_callback=engine.log)
-    run_command("sleep 3 && sudo reboot", log_callback=engine.log)
+    run_command("sudo systemctl daemon-reload")
+    run_command("sleep 3 && sudo reboot")
 
 if __name__ == "__main__":
     curses.wrapper(main)
