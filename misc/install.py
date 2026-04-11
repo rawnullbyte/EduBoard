@@ -162,6 +162,12 @@ def main(stdscr):
     run_command(f"sudo apt install -y {package_list}", log_callback=engine.log)
     engine.log("✓ Dependencies installed")
 
+    # --- Fastfetch ---
+    engine.log("→ Installing fastfetch...")
+    run_command("wget https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-amd64.deb -O /tmp/fastfetch.deb", log_callback=engine.log)
+    run_command("sudo dpkg -i /tmp/fastfetch.deb", log_callback=engine.log)
+    engine.log("✓ Fastfetch installed")
+
     # --- Application Setup ---
     engine.log("")
     engine.log("→ Setting up EduBoard application...")
