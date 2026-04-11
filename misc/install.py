@@ -268,6 +268,7 @@ Environment=WLR_BACKENDS=drm
 Environment=XDG_RUNTIME_DIR=/run/user/%U
 Environment=WAYLAND_DISPLAY=wayland-0
 Environment=LIBSEAT_BACKEND=seatd
+Environment=WLR_LIBINPUT_NO_DEVICES=1
 StandardInput=tty
 StandardOutput=tty
 TTYPath=/dev/tty2
