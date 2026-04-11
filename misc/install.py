@@ -127,7 +127,7 @@ def main(stdscr):
     uid = uid_result.stdout.strip()
     
     run_command(
-        f"sudo usermod -aG video,audio,input,tty,render,sudo {username}", 
+        f"sudo usermod -aG video,audio,input,tty,render,sudo,seat {username}", 
         log_callback=engine.log
     )
     engine.log(f"✓ Added user to required groups")
@@ -155,7 +155,8 @@ def main(stdscr):
         "kmscon",
         "cage",
         "firefox-esr",
-        "wlr-randr"
+        "wlr-randr",
+        "seatd"
     ]
     
     package_list = " ".join(packages)
@@ -231,7 +232,7 @@ RestartSec=3
 Environment="PATH={venv_dir}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 Environment=PYTHONUNBUFFERED=1
 Environment=WAYLAND_DISPLAY=wayland-0
-Environment=XDG_RUNTIME_DIR=/run/user/{uid}
+Environment=XDG_RUNTIME_DIR=/run/user/%U
 
 [Install]
 WantedBy=multi-user.target
@@ -256,20 +257,23 @@ hwaccel
     
     kiosk_service_content = f"""[Unit]
 Description=EduBoard Kiosk (Cage) on TTY2
-After=network.target EduBoard.service
-Requires=EduBoard.service
+After=network.target EduBoard.service seatd.service
+Requires=EduBoard.service seatd.service
 
 [Service]
 User={username}
 Group={username}
-Environment=XDG_RUNTIME_DIR=/run/user/{uid}
+PAMName=login
+Environment=WLR_BACKENDS=drm
+Environment=XDG_RUNTIME_DIR=/run/user/%U
 Environment=WAYLAND_DISPLAY=wayland-0
+Environment=LIBSEAT_BACKEND=seatd
 StandardInput=tty
 StandardOutput=tty
 TTYPath=/dev/tty2
 ExecStartPre=/usr/bin/chvt 2
-ExecStart=/usr/bin/cage -s -- /bin/bash -c "while ! curl -s http://localhost:8000 > /dev/null; do sleep 1; done; /usr/bin/firefox-esr --kiosk http://localhost:8000"
-estart=always
+ExecStart=/usr/bin/cage -s -- /usr/bin/firefox-esr --kiosk http://localhost:8000
+Restart=always
 RestartSec=5
 
 [Install]
@@ -301,8 +305,11 @@ ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/km
     engine.log("")
     engine.log("→ Finalizing installation...")
     run_command("sudo systemctl daemon-reload")
-    run_command("sudo systemctl enable EduBoard.service", log_callback=engine.log)
-    run_command("sudo systemctl enable kiosk.service", log_callback=engine.log)
+    run_command("sudo systemctl enable EduBoard", log_callback=engine.log)
+    run_command("sudo systemctl enable kiosk", log_callback=engine.log)
+    run_command("sudo systemctl enable seatd", log_callback=engine.log)
+
+    run_command(f"sudo loginctl enable-linger {username}", log_callback=engine.log)
     
     engine.log("")
     engine.log("╔══════════════════════════════════════╗")
