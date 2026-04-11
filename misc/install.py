@@ -271,8 +271,7 @@ Environment=LIBSEAT_BACKEND=seatd
 StandardInput=tty
 StandardOutput=tty
 TTYPath=/dev/tty2
-ExecStartPre=/usr/bin/chvt 2
-ExecStart=/usr/bin/cage -s -- /usr/bin/firefox-esr --kiosk http://localhost:8000
+ExecStart=/bin/bash -c 'until [ "$(curl -s -o /dev/null -w "%%{http_code}" http://localhost:8000)" -eq 200 ]; do sleep 1; done; /usr/bin/cage -s -- /usr/bin/firefox-esr --kiosk http://localhost:8000'
 Restart=always
 RestartSec=5
 
