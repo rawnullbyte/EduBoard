@@ -2,26 +2,27 @@ import subprocess
 import os
 import shutil
 from pathlib import Path
-import curses
-import pwd
 from aengine import AnimationEngine
 from logo import text as logo_ascii
+import curses
+import pwd
 
 def run_command(command, user=None, cwd=None, env=None, log_callback=None):
     custom_env = os.environ.copy()
     custom_env["DEBIAN_FRONTEND"] = "noninteractive"
-    
-    # Environment variables to force UTF-8 during the setup process
-    setup_env = "export DEBIAN_FRONTEND=noninteractive LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8"
+    custom_env["TERM"] = "xterm-256color" 
+    if env:
+        custom_env.update(env)
+
     directory = cwd if cwd else "."
+    setup_env = "export TERM=xterm-256color DEBIAN_FRONTEND=noninteractive LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 && "
     
     if user:
-        # Escaping internal single quotes to prevent the shell from breaking
+        # Escaping for deep shell nesting
         escaped_command = command.replace("'", "'\\''")
-        full_command = f"sudo -u {user} -i bash -c '{setup_env} && cd {directory} && {escaped_command}'"
+        full_command = f"sudo -u {user} -i bash -c '{setup_env} cd {directory} && {escaped_command}'"
     else:
-        # Standard root-level execution
-        full_command = f"bash -c '{setup_env} && {command}'"
+        full_command = f"bash -c '{setup_env} {command}'"
 
     if log_callback:
         log_callback(f"Executing: {command}...")
@@ -67,48 +68,41 @@ def set_hostname(hostname, log_callback=None):
         return False
 
 def main(stdscr):
-    # --- Animation Engine Sequence ---
+    # --- ANIMATIONS RESTORED ---
     engine = AnimationEngine(stdscr)
     engine.set_ascii(logo_ascii)
     engine.animate_ascii_move(duration=3, direction="up")
     engine.sleep(1)
     engine.animate_ascii_move(duration=3, direction="out")
-    engine.log("=== EduBoard KMS Unicode Setup ===")
+    engine.log("=== EduBoard Setup ===")
     
-    # --- Input Configuration ---
+    # --- Config ---
     hostname = engine.ask("Hostname: ", "tv1") or "tv1"
     username = engine.ask("User: ", "kiosk") or "kiosk"
     subdomain = engine.ask("Subdomain: ", "school") or "school"
     screen_id = engine.ask("Screen ID: ", "1") or "1"
     password = engine.ask("Password: ", "123456") or "123456"
 
-    home_dir = f"/home/{username}"
-    repo_dir = f"{home_dir}/EduBoard"
-    venv_dir = f"{home_dir}/venv"
+    home_dir, repo_dir, venv_dir = f"/home/{username}", f"/home/{username}/EduBoard", f"/home/{username}/venv"
 
-    # --- Initial System Setup ---
+    # --- System Setup ---
     set_hostname(hostname, engine.log)
-    
-    # Robust user check to avoid exit status 51
     try:
         pwd.getpwnam(username)
-        engine.log(f"User '{username}' already exists. Skipping adduser.")
+        engine.log(f"User {username} exists.")
     except KeyError:
-        # Using double-quotes for GECOS to survive bash-sudo-bash nesting
-        run_command(f'sudo adduser --disabled-password --gecos "" {username}', log_callback=engine.log)
+        run_command(f"sudo adduser --disabled-password --gecos '' {username}", log_callback=engine.log)
     
     run_command(f"sudo usermod -aG video,audio,input,tty,render {username}", log_callback=engine.log)
 
     # --- Dependencies & KMSCON ---
-    engine.log("Installing Node 22, KMSCON & Unicode Fonts...")
+    engine.log("Installing Node 22 and Unicode Terminal...")
     run_command("curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -", log_callback=engine.log)
     run_command("sudo apt update", log_callback=engine.log)
-    
-    # fonts-symbola handles the Braille patterns that standard fonts miss
     deps = [
         "curl", "git", "build-essential", "python3-full", "python3-venv", "nodejs",
-        "kmscon", "fonts-symbola", "fonts-noto-core", "fonts-dejavu-core",
-        "xserver-xorg", "xinit"
+        "xserver-xorg", "xinit", "openbox", "firefox", "kmscon", 
+        "fonts-symbola", "fonts-noto-core", "fonts-dejavu-core"
     ]
     run_command(f"sudo apt install -y {' '.join(deps)}", log_callback=engine.log)
 
@@ -116,45 +110,48 @@ def main(stdscr):
     run_command("sudo locale-gen en_US.UTF-8", log_callback=engine.log)
     run_command("sudo update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8", log_callback=engine.log)
 
-    # --- Project Setup ---
+    # --- App Setup ---
     if not os.path.exists(repo_dir):
         run_command(f"git clone https://github.com/rawnullbyte/EduBoard.git {repo_dir}", user=username, log_callback=engine.log)
     
     write_file(f"{repo_dir}/.env", f"SCHOOL_SUBDOMAIN={subdomain}\nSCREEN_ID={screen_id}\nPASSWORD={password}\n", user=username)
 
-    engine.log("Configuring Python Environment...")
+    engine.log("Setting up Python Venv...")
     run_command(f"python3 -m venv {venv_dir}", user=username, log_callback=engine.log)
     run_command(f"{venv_dir}/bin/pip install --upgrade pip", user=username, log_callback=engine.log)
     run_command(f"{venv_dir}/bin/pip install -r requirements.txt", user=username, cwd=repo_dir, log_callback=engine.log)
 
-    engine.log("Building Frontend Assets...")
+    engine.log("Building Frontend...")
     run_command("npm install && npm run build", user=username, cwd=f"{repo_dir}/frontend", log_callback=engine.log)
 
-    # --- Shell Profile Hook ---
-    # kmscon autologs in, launches bash, bash reads this file, and starts your script.
+    # --- Shell Logic ---
     bash_profile = f"""
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 export LANGUAGE=en_US.UTF-8
 
 if [[ $(tty) == /dev/tty1 ]]; then
-    {venv_dir}/bin/python {repo_dir}/misc/boot.py
+    exec {venv_dir}/bin/python {repo_dir}/misc/boot.py
 fi
 """
     write_file(f"{home_dir}/.bash_profile", bash_profile, user=username)
+    write_file(f"{home_dir}/.bashrc", "[[ -f ~/.bash_profile ]] && . ~/.bash_profile\n", user=username)
 
-    # --- KMSCON Integration ---
-    # This overrides the default tty1 getty to use a GPU-accelerated terminal
+    # --- KMSCON Service (The "Real Shell" Fix) ---
     kms_override = f"""[Service]
 ExecStart=
-ExecStart=-/usr/bin/kmscon --login --vt vt1 --allow-keyboard --font-name "Monospace" --font-size 14 --autologin {username}
+ExecStart=-/usr/bin/kmscon --login --vt vt1 --allow-keyboard --font-name "Monospace" --font-size 14 --autologin {username} -- /bin/bash --login
 Environment=LANG=en_US.UTF-8
 Environment=LC_ALL=en_US.UTF-8
 """
     os.makedirs("/etc/systemd/system/getty@tty1.service.d", exist_ok=True)
     write_file("/etc/systemd/system/getty@tty1.service.d/override.conf", kms_override)
 
-    engine.log("Finalizing Installation...")
+    # Ensure we don't boot into a GUI login screen
+    engine.log("Disabling graphical login manager...")
+    run_command("sudo systemctl set-default multi-user.target", log_callback=engine.log)
+
+    engine.log("Finalizing...")
     run_command("sudo systemctl daemon-reload", log_callback=engine.log)
     run_command("sleep 3 && sudo reboot", log_callback=engine.log)
 
