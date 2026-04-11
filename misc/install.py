@@ -7,6 +7,11 @@ from logo import text as logo_ascii
 import curses
 
 def run_command(command, user=None, cwd=None, env=None, log_callback=None):
+    custom_env = os.environ.copy()
+    custom_env["DEBIAN_FRONTEND"] = "noninteractive"
+    if env:
+        custom_env.update(env)
+
     if user:
         command = f"sudo -u {user} {command}"
     
@@ -15,26 +20,20 @@ def run_command(command, user=None, cwd=None, env=None, log_callback=None):
         shell=True,
         executable="/bin/bash",
         cwd=cwd,
-        env=env,
+        env=custom_env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1
     )
 
-    while True:
-        line = process.stdout.readline()
-        if not line and process.poll() is not None:
-            break
-        
-        if line and log_callback:
+    for line in iter(process.stdout.readline, ''):
+        if log_callback:
             log_callback(line.strip())
             
     return_code = process.wait()
     if return_code != 0:
         raise subprocess.CalledProcessError(return_code, command)
-    
-    return process
 
 def write_file(path, content, user=None, mode=0o644):
     """Writes content to a file and sets ownership/permissions."""
