@@ -1,10 +1,12 @@
 #!/bin/bash
+set -euo pipefail
 
-VENV_PATH=$1
+VENV_PATH=${1:-}
 
 if [ -n "$VENV_PATH" ]; then
     if [ -f "$VENV_PATH/bin/activate" ]; then
         echo "🐍 Activating virtual environment from: $VENV_PATH"
+        # shellcheck disable=SC1090
         source "$VENV_PATH/bin/activate"
     else
         echo "❌ Error: Activation script not found in $VENV_PATH"
@@ -17,7 +19,9 @@ fi
 echo "🚀 Starting EduBoard..."
 
 echo "📥 Pulling latest changes from git..."
-git pull --rebase --autostash
+if ! git pull --rebase --autostash; then
+    echo "⚠️  git pull failed, continuing with the current checkout"
+fi
 
 echo "📥 Installing Python dependencies..."
 python3 -m pip install --upgrade pip
@@ -26,8 +30,11 @@ python3 -m pip install -r requirements.txt
 echo "🏗️  Building frontend..."
 cd frontend
 
-if [ ! -d "node_modules" ]; then
-    echo "📦 Installing frontend dependencies..."
+if [ -f "package-lock.json" ]; then
+    echo "📦 Installing frontend dependencies with npm ci..."
+    npm ci
+else
+    echo "📦 Installing frontend dependencies with npm install..."
     npm install
 fi
 
