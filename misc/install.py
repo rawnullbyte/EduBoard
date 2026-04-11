@@ -304,6 +304,7 @@ ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/km
     # Disable conflicting services
     engine.log("  Disabling conflicting terminal services...")
     run_command("sudo systemctl mask getty@tty1.service")
+    run_command("sudo systemctl mask getty@tty2.service")
     run_command("sudo systemctl mask serial-getty@ttyS0.service")
     run_command("sudo systemctl mask serial-getty@hvc0.service")
     
