@@ -18,7 +18,6 @@ def run_command(command, user=None, cwd=None, env=None, log_callback=None):
     setup_env = "export TERM=xterm-256color DEBIAN_FRONTEND=noninteractive LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 && "
     
     if user:
-        # Escaping for deep shell nesting
         escaped_command = command.replace("'", "'\\''")
         full_command = f"sudo -u {user} -i bash -c '{setup_env} cd {directory} && {escaped_command}'"
     else:
@@ -68,7 +67,7 @@ def set_hostname(hostname, log_callback=None):
         return False
 
 def main(stdscr):
-    # --- ANIMATIONS RESTORED ---
+    # --- ALL ANIMATIONS PRESERVED ---
     engine = AnimationEngine(stdscr)
     engine.set_ascii(logo_ascii)
     engine.animate_ascii_move(duration=3, direction="up")
@@ -124,13 +123,14 @@ def main(stdscr):
     engine.log("Building Frontend...")
     run_command("npm install && npm run build", user=username, cwd=f"{repo_dir}/frontend", log_callback=engine.log)
 
-    # --- Shell Logic ---
+    # --- Shell Logic (Broadened to catch pts/0) ---
     bash_profile = f"""
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 export LANGUAGE=en_US.UTF-8
 
-if [[ $(tty) == /dev/tty1 ]]; then
+CURRENT_TTY=$(tty)
+if [[ "$CURRENT_TTY" == "/dev/tty1" || "$CURRENT_TTY" == "/dev/pts/0" ]]; then
     exec {venv_dir}/bin/python {repo_dir}/misc/boot.py
 fi
 """
@@ -138,16 +138,20 @@ fi
     write_file(f"{home_dir}/.bashrc", "[[ -f ~/.bash_profile ]] && . ~/.bash_profile\n", user=username)
 
     # --- KMSCON Service (The "Real Shell" Fix) ---
-    kms_override = f"""[Service]
+    # We apply this to both standard tty and serial to be safe for VMs
+    kms_config = f"""[Service]
 ExecStart=
 ExecStart=-/usr/bin/kmscon --login --vt vt1 --allow-keyboard --font-name "Monospace" --font-size 14 --autologin {username} -- /bin/bash --login
 Environment=LANG=en_US.UTF-8
 Environment=LC_ALL=en_US.UTF-8
 """
     os.makedirs("/etc/systemd/system/getty@tty1.service.d", exist_ok=True)
-    write_file("/etc/systemd/system/getty@tty1.service.d/override.conf", kms_override)
+    write_file("/etc/systemd/system/getty@tty1.service.d/override.conf", kms_config)
+    
+    # Force auto-login on serial consoles (common for VMs showing pts/0)
+    os.makedirs("/etc/systemd/system/serial-getty@ttyS0.service.d", exist_ok=True)
+    write_file("/etc/systemd/system/serial-getty@ttyS0.service.d/override.conf", kms_config)
 
-    # Ensure we don't boot into a GUI login screen
     engine.log("Disabling graphical login manager...")
     run_command("sudo systemctl set-default multi-user.target", log_callback=engine.log)
 
