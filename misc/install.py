@@ -155,7 +155,7 @@ def main(stdscr):
     engine.log("✓ Dependencies installed")
 
     run_command(
-        "sudo groupadd -r seat",
+        "sudo groupadd -r seat 2>/dev/null",
         log_callback=engine.log
     )
     run_command(
