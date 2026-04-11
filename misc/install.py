@@ -33,7 +33,9 @@ def run_command(command, user=None, cwd=None, env=None, log_callback=None):
         if log_callback:
             log_callback(f"ERROR: {process.stderr}")
         raise subprocess.CalledProcessError(process.returncode, full_command, output=process.stdout, stderr=process.stderr)
-    log_callback(f"OUTPUT: {process.stderr}")
+    
+    if log_callback:
+        log_callback(f"OUTPUT: {process.stdout}")
 
     return process
 
@@ -86,41 +88,41 @@ def main(stdscr):
     try:
         subprocess.run(["id", username], check=True, capture_output=True)
     except subprocess.CalledProcessError:
-        run_command(f"sudo adduser --disabled-password --gecos '' {username}")
+        run_command(f"sudo adduser --disabled-password --gecos '' {username}", log_callback=engine.log)
     
-    run_command(f"sudo usermod -aG video,audio,input,tty,render {username}")
+    run_command(f"sudo usermod -aG video,audio,input,tty,render {username}", log_callback=engine.log)
 
     # --- Dependencies & Node 22 ---
     engine.log("Installing Node 22 and Dependencies...")
-    run_command("curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -")
-    run_command("sudo apt update")
+    run_command("curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -", log_callback=engine.log)
+    run_command("sudo apt update", log_callback=engine.log)
     deps = [
         "curl", "git", "build-essential", "python3-full", "python3-venv", "nodejs",
         "xserver-xorg", "xinit", "openbox", "firefox", "fbterm", "fonts-terminus",
         "fonts-noto-core", "fonts-dejavu-core"
     ]
-    run_command(f"sudo apt install -y {' '.join(deps)}")
+    run_command(f"sudo apt install -y {' '.join(deps)}", log_callback=engine.log)
 
     engine.log("Granting fbterm TTY permissions...")
-    run_command("sudo setcap 'cap_sys_tty_config+ep' /usr/bin/fbterm")
+    run_command("sudo setcap 'cap_sys_tty_config+ep' /usr/bin/fbterm", log_callback=engine.log)
 
     engine.log("Generating Locales...")
-    run_command("sudo locale-gen en_US.UTF-8")
-    run_command("sudo update-locale LANG=en_US.UTF-8")
+    run_command("sudo locale-gen en_US.UTF-8", log_callback=engine.log)
+    run_command("sudo update-locale LANG=en_US.UTF-8", log_callback=engine.log)
 
     # --- App Setup ---
     if not os.path.exists(repo_dir):
-        run_command(f"git clone https://github.com/rawnullbyte/EduBoard.git {repo_dir}", user=username)
+        run_command(f"git clone https://github.com/rawnullbyte/EduBoard.git {repo_dir}", user=username, log_callback=engine.log)
     
     write_file(f"{repo_dir}/.env", f"SCHOOL_SUBDOMAIN={subdomain}\nSCREEN_ID={screen_id}\nPASSWORD={password}\n", user=username)
 
     engine.log("Setting up Python Venv...")
-    run_command(f"python3 -m venv {venv_dir}", user=username)
-    run_command(f"{venv_dir}/bin/pip install --upgrade pip", user=username)
-    run_command(f"{venv_dir}/bin/pip install -r requirements.txt", user=username, cwd=repo_dir)
+    run_command(f"python3 -m venv {venv_dir}", user=username, log_callback=engine.log)
+    run_command(f"{venv_dir}/bin/pip install --upgrade pip", user=username, log_callback=engine.log)
+    run_command(f"{venv_dir}/bin/pip install -r requirements.txt", user=username, cwd=repo_dir, log_callback=engine.log)
 
     engine.log("Building Frontend...")
-    run_command("npm install && npm run build", user=username, cwd=f"{repo_dir}/frontend")
+    run_command("npm install && npm run build", user=username, cwd=f"{repo_dir}/frontend", log_callback=engine.log)
 
     # --- Config Files ---
     bash_profile = f"""
@@ -157,8 +159,8 @@ WantedBy=multi-user.target"""
     write_file("/etc/systemd/system/eduboard.service", service)
 
     engine.log("Finalizing...")
-    run_command("sudo systemctl daemon-reload && sudo systemctl enable eduboard.service")
-    run_command("sleep 3 && sudo reboot")
+    run_command("sudo systemctl daemon-reload && sudo systemctl enable eduboard.service", log_callback=engine.log)
+    run_command("sleep 3 && sudo reboot", log_callback=engine.log)
 
 if __name__ == "__main__":
     curses.wrapper(main)
