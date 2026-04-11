@@ -169,6 +169,19 @@ def main(stdscr):
     run_command("sudo dpkg -i /tmp/fastfetch.deb", log_callback=engine.log)
     engine.log("✓ Fastfetch installed")
 
+    firefox_policies = """{
+  "policies": {
+    "DisableAppUpdate": true,
+    "DontCheckDefaultBrowser": true,
+    "NoDefaultBookmarks": true,
+    "OverrideFirstRunPage": "",
+    "OverridePostUpdatePage": ""
+  }
+}
+"""
+    write_file("/usr/lib/firefox-esr/distribution/policies.json", firefox_policies)
+    engine.log("✓ Firefox policies written")
+
     # --- Application Setup ---
     engine.log("")
     engine.log("→ Setting up EduBoard application...")
@@ -227,58 +240,6 @@ WantedBy=multi-user.target
     write_file("/etc/systemd/system/EduBoard.service", service_content)
     engine.log("✓ EduBoard service created!")
 
-    # --- Cage Auto-start Service ---
-    engine.log("")
-    engine.log("→ Creating Cage auto-start service...")
-    
-    cage_service_content = f"""[Unit]
-Description=Cage Wayland compositor on tty2
-After=systemd-user-sessions.service plymouth-quit-wait.service dbus.socket systemd-logind.service EduBoard.service
-Before=graphical.target
-ConditionPathExists=/dev/tty0
-Wants=dbus.socket systemd-logind.service
-Conflicts=getty@tty2.service
-After=getty@tty2.service
-
-[Service]
-Type=simple
-ExecStartPre=/bin/mkdir -p /run/user/{uid}
-ExecStartPre=/bin/chown {username}:{username} /run/user/{uid}
-ExecStartPre=/bin/chmod 700 /run/user/{uid}
-ExecStart=/usr/bin/cage -s -- /usr/bin/firefox-esr --kiosk --no-default-browser-check http://localhost:8000
-Restart=always
-RestartSec=3
-User={username}
-Environment=XDG_RUNTIME_DIR=/run/user/{uid}
-Environment=MOZ_ENABLE_WAYLAND=1
-Environment=XCURSOR_THEME=
-Environment=XCURSOR_SIZE=1
-UtmpIdentifier=tty2
-UtmpMode=user
-TTYPath=/dev/tty2
-TTYReset=yes
-TTYVHangup=no
-TTYVTDisallocate=yes
-StandardInput=tty-fail
-PAMName=cage
-
-[Install]
-WantedBy=graphical.target
-"""
-
-    write_file("/etc/systemd/system/cage-kiosk.service", cage_service_content)
-
-    pam_cage_content = """#%PAM-1.0
-auth       required   pam_unix.so
-account    required   pam_unix.so
-session    required   pam_unix.so
-session    optional   pam_systemd.so
-"""
-    write_file("/etc/pam.d/cage", pam_cage_content)
-    engine.log("✓ PAM cage config written")
-
-    engine.log("✓ Cage auto-start service created")
-
     # --- KMSCON Terminal Configuration ---
     engine.log("")
     engine.log("→ Configuring KMSCON terminal...")
@@ -298,7 +259,16 @@ ExecStart=
 ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/kmscon --term xterm-256color --login -- /bin/su -l {username} -c "exec {venv_dir}/bin/python {repo_dir}/misc/boot.py"
 """
     write_file(f"{override_dir}/override.conf", override_content)
-    engine.log(f"✓ Auto-login configured for user '{username}' on tty1")
+    engine.log(f"✓ KMSCON configured for user '{username}' on tty1")
+
+    # Systemd override for tty2 (Cage)
+    override_dir = "/etc/systemd/system/kmsconvt@tty2.service.d"
+    override_content = f"""[Service]
+ExecStart=
+ExecStart=/usr/libexec/kmscon/kmscon --vt tty2 --seats seat0 --configdir /etc/kmscon --term xterm-256color --login -- /bin/su -l {username} -c "exec {venv_dir}/bin/python {repo_dir}/misc/boot.py"
+"""
+    write_file(f"{override_dir}/override.conf", override_content)
+    engine.log(f"✓ KMSCON configured for user '{username}' on tty2")
 
     # Disable conflicting services
     engine.log("  Disabling conflicting terminal services...")
@@ -309,7 +279,7 @@ ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/km
     
     # Enable KMSCON and Cage services
     run_command("sudo systemctl enable kmsconvt@tty1.service", log_callback=engine.log)
-    run_command("sudo systemctl enable cage-kiosk.service", log_callback=engine.log)
+    run_command("sudo systemctl enable kmsconvt@tty2.service", log_callback=engine.log)
     engine.log("✓ Services enabled")
 
     # --- Final Setup ---
