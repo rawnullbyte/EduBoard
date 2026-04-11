@@ -266,7 +266,7 @@ class ScreenManager():
             except Exception as e:
                 print(f"Timer Loop Error: {e}")
             
-            await asyncio.sleep(10)
+            await asyncio.sleep(60)
 
 # Class instances
 edub = EduBoard()
