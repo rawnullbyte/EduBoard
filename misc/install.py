@@ -127,7 +127,7 @@ def main(stdscr):
     uid = uid_result.stdout.strip()
     
     run_command(
-        f"sudo usermod -aG video,audio,input,tty,render,sudo,seat {username}", 
+        f"sudo usermod -aG video,audio,input,tty,render,sudo {username}", 
         log_callback=engine.log
     )
     engine.log(f"✓ Added user to required groups")
