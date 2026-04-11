@@ -147,17 +147,55 @@ def main(stdscr):
         "python3-full",
         "python3-venv",
         "nodejs",
-        "kmscon",
         "fonts-symbola",
         "fonts-noto-core",
         "fonts-dejavu",
-        "fonts-wqy-microhei"
+        "fonts-wqy-microhei",
+        "xorg",
+        "openbox",
+        "xinit",
+        "x11-xserver-utils",
+        "unclutter",
+        "firefox"
     ]
     
     package_list = " ".join(packages)
     engine.log(f"  Installing: {package_list}")
     run_command(f"sudo apt install -y {package_list}", log_callback=engine.log)
     engine.log("✓ Dependencies installed")
+
+    # --- Disable screensaver but keep DPMS ---
+    engine.log("")
+    engine.log("→ Disabling screensaver (DPMS remains enabled)...")
+    
+    xorg_conf_content = '''Section "ServerFlags"
+    Option "BlankTime" "0"
+    Option "StandbyTime" "0"
+    Option "SuspendTime" "0"
+    Option "OffTime" "0"
+EndSection
+'''
+    write_file("/etc/X11/xorg.conf.d/10-disable-blanking.conf", xorg_conf_content)
+    
+    run_command("sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target")
+    engine.log("✓ Screensaver disabled, DPMS remains active")
+
+    # --- OpenBox Minimal Config ---
+    engine.log("")
+    engine.log("→ Configuring minimal OpenBox...")
+    
+    openbox_autostart_content = '''#!/bin/bash
+xset s off
+unclutter -idle 1 -root &
+''' + f"{venv_dir}/bin/python {repo_dir}/misc/boot.py" + ''' &
+firefox --kiosk http://localhost:8000 &
+'''
+    
+    openbox_dir = f"{home_dir}/.config/openbox"
+    run_command(f"sudo -u {username} mkdir -p {openbox_dir}")
+    write_file(f"{openbox_dir}/autostart", openbox_autostart_content, user=username, mode=0o755)
+    
+    engine.log("✓ OpenBox configured")
 
     # --- Application Setup ---
     engine.log("")
@@ -173,15 +211,14 @@ def main(stdscr):
     else:
         engine.log("  Repository already exists, skipping clone")
     
-    # Write environment configuration
     env_content = f"""SCHOOL_SUBDOMAIN={subdomain}
 SCREEN_ID={screen_id}
 PASSWORD={password}
+DISPLAY=:0
 """
     write_file(f"{repo_dir}/.env", env_content, user=username)
     engine.log("✓ Environment configuration written")
     
-    # Python virtual environment
     engine.log("  Creating Python virtual environment...")
     run_command(
         f"python3 -m venv {venv_dir}", 
@@ -198,7 +235,6 @@ PASSWORD={password}
     )
     engine.log("✓ Python dependencies installed")
     
-    # Frontend build
     engine.log("  Building frontend assets...")
     run_command(
         "npm install && npm run build", 
@@ -208,41 +244,35 @@ PASSWORD={password}
     )
     engine.log("✓ Frontend built successfully")
 
-    # --- KMSCON Terminal Configuration ---
+    # --- X11 Auto-start ---
     engine.log("")
-    engine.log("→ Configuring KMSCON terminal...")
+    engine.log("→ Configuring auto-login...")
     
-    kmscon_conf_content = """font-name=DejaVu Sans Mono, WenQuanYi Micro Hei Mono
-font-size=14
-term=xterm-256color
-hwaccel
-"""
-    write_file("/etc/kmscon/kmscon.conf", kmscon_conf_content)
-    engine.log("✓ KMSCON configuration written")
-
-    # Systemd override for auto-login
-    override_dir = "/etc/systemd/system/kmsconvt@tty1.service.d"
-    override_content = f"""[Service]
+    xinitrc_content = '''#!/bin/bash
+xset s off
+exec openbox-session
+'''
+    write_file(f"{home_dir}/.xinitrc", xinitrc_content, user=username, mode=0o755)
+    
+    bash_profile_content = '''if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
+    exec startx
+fi
+'''
+    write_file(f"{home_dir}/.bash_profile", bash_profile_content, user=username)
+    
+    autologin_service_content = f'''[Service]
 ExecStart=
-ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/kmscon --term xterm-256color --login -- /bin/su -l {username} -c "exec {venv_dir}/bin/python {repo_dir}/misc/boot.py"
-"""
-    write_file(f"{override_dir}/override.conf", override_content)
-    engine.log(f"✓ Auto-login configured for user '{username}'")
-
-    # Disable conflicting services
-    engine.log("  Disabling conflicting terminal services...")
-    run_command("sudo systemctl mask getty@tty1.service")
-    run_command("sudo systemctl mask serial-getty@ttyS0.service")
-    run_command("sudo systemctl mask serial-getty@hvc0.service")
+ExecStart=-/sbin/agetty --autologin {username} --noclear %I $TERM
+Type=idle
+'''
+    write_file("/etc/systemd/system/getty@tty1.service.d/autologin.conf", autologin_service_content)
     
-    # Enable KMSCON
-    run_command("sudo systemctl enable kmsconvt@tty1.service", log_callback=engine.log)
-    engine.log("✓ KMSCON service enabled")
+    run_command("sudo systemctl set-default graphical.target", log_callback=engine.log)
+    engine.log("✓ Auto-login configured")
 
     # --- Final Setup ---
     engine.log("")
     engine.log("→ Finalizing installation...")
-    run_command("sudo systemctl set-default multi-user.target", log_callback=engine.log)
     run_command("sudo systemctl daemon-reload")
     
     engine.log("")

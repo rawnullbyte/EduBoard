@@ -41,7 +41,7 @@ class AnimationEngine:
         try:
             for i in range(1, 7):
                 curses.init_pair(i, 231 + (i * 4), -1)
-            curses.init_pair(10, curses.COLOR_GREEN, -1)
+            curses.init_pair(10, curses.COLOR_WHITE, -1)
             curses.init_pair(11, 8, -1) 
         except curses.error: pass
 
