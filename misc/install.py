@@ -139,8 +139,9 @@ def main(stdscr):
 
     engine.log("Configuring console for Unicode support...")
     run_command("sudo sed -i 's/CHARMAP=.*/CHARMAP=\"UTF-8\"/' /etc/default/console-setup")
-    run_command("sudo sed -i 's/FONTFACE=.*/FONTFACE=\"Terminus\"/' /etc/default/console-setup")
-    run_command("sudo sed -i 's/FONTSIZE=.*/FONTSIZE=\"16x32\"/' /etc/default/console-setup")
+    run_command("sudo sed -i 's/FONTFACE=.*/FONTFACE=\"Fixed\"/' /etc/default/console-setup")
+    run_command("sudo sed -i 's/FONTSIZE=.*/FONTSIZE=\"8x16\"/' /etc/default/console-setup")
+    run_command("sudo setupcon")
     run_command("printf '\\033%%G' > /dev/tty1")
 
     # --- App Setup ---
@@ -180,6 +181,7 @@ def main(stdscr):
 export TERM=xterm-256color
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
 printf '\\033%%G'
 if [[ -z $DISPLAY && $(tty) = /dev/tty1 ]]; then
     {venv_dir}/bin/python {repo_dir}/misc/boot.py
