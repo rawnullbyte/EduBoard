@@ -186,8 +186,7 @@ EndSection
     openbox_autostart_content = '''#!/bin/bash
 xset s off
 unclutter -idle 1 -root &
-''' + f"{venv_dir}/bin/python {repo_dir}/misc/boot.py" + ''' &
-firefox --kiosk http://localhost:8000 &
+firefox --kiosk http://localhost:8000
 '''
     
     openbox_dir = f"{home_dir}/.config/openbox"

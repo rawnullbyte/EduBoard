@@ -54,7 +54,7 @@ def main(stdscr):
         for iface in interfaces:
             engine.log(f"  {iface}")
     
-    result = subprocess.run(["systemctl", "is-active", "eduboard.service"], capture_output=True, text=True)
+    result = subprocess.run(["systemctl", "is-active", "EduBoard.service"], capture_output=True, text=True)
     if result.returncode == 0:
         engine.log("Backend Service: running")
     else:
