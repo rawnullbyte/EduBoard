@@ -10,38 +10,41 @@ import curses
 import subprocess
 import os
 
+import subprocess
+import os
+
 def run_command(command, user=None, cwd=None, env=None, log_callback=None):
+    # Setup environment
     custom_env = os.environ.copy()
     custom_env["DEBIAN_FRONTEND"] = "noninteractive"
     if env:
         custom_env.update(env)
 
+    directory = cwd if cwd else "."
+
     if user:
-        directory = cwd if cwd else "."
         full_command = f"sudo -u {user} -i bash -c 'cd {directory} && {command}'"
     else:
         full_command = command
 
-    process = subprocess.Popen(
+    if log_callback:
+        log_callback(f"Executing: {command}...")
+
+    process = subprocess.run(
         full_command,
         shell=True,
         executable="/bin/bash",
         env=custom_env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-        universal_newlines=True
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
     )
 
-    for line in iter(process.stdout.readline, ''):
-        clean_line = line.strip()
-        if clean_line and log_callback:
-            log_callback(clean_line)
-            
-    return_code = process.wait()
-    if return_code != 0:
-        raise subprocess.CalledProcessError(return_code, full_command)
+    if process.returncode != 0:
+        if log_callback:
+            log_callback(f"ERROR: Command failed with code {process.returncode}")
+        raise subprocess.CalledProcessError(process.returncode, full_command)
+    
+    return process
 
 def write_file(path, content, user=None, mode=0o644):
     """Writes content to a file and sets ownership/permissions."""
