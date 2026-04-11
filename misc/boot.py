@@ -26,6 +26,7 @@ def main(stdscr):
     engine.animate_ascii_move(duration=3, direction="up")
     engine.sleep(1)
     engine.animate_ascii_move(duration=3, direction="out")
+    engine.running = False
 
     tty = os.readlink("/proc/self/fd/0").replace("/dev/", "")
     if tty == "tty2":
