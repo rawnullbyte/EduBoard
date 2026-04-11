@@ -153,7 +153,7 @@ def main(stdscr):
         "fonts-wqy-microhei",
         "kmscon",
         "cage",
-        "firefox-esr"
+        "firefox"
     ]
     
     package_list = " ".join(packages)
@@ -237,7 +237,7 @@ ExecStartPre=/bin/chmod 700 /run/user/{uid}
 Environment=XDG_RUNTIME_DIR=/run/user/{uid}
 Environment=WAYLAND_DISPLAY=wayland-0
 Environment=MOZ_ENABLE_WAYLAND=1
-ExecStart=/usr/bin/cage -s -- /usr/bin/firefox-esr --kiosk http://localhost:8000
+ExecStart=/usr/bin/cage -s -- /usr/bin/firefox --kiosk http://localhost:8000
 Restart=always
 RestartSec=5
 StandardOutput=journal
