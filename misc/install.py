@@ -14,7 +14,6 @@ import subprocess
 import os
 
 def run_command(command, user=None, cwd=None, env=None, log_callback=None):
-    # Setup environment
     custom_env = os.environ.copy()
     custom_env["DEBIAN_FRONTEND"] = "noninteractive"
     if env:
@@ -35,14 +34,14 @@ def run_command(command, user=None, cwd=None, env=None, log_callback=None):
         shell=True,
         executable="/bin/bash",
         env=custom_env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
+        capture_output=True,
+        text=True
     )
 
     if process.returncode != 0:
         if log_callback:
-            log_callback(f"ERROR: Command failed with code {process.returncode}")
-        raise subprocess.CalledProcessError(process.returncode, full_command)
+            log_callback(f"ERROR: {process.stderr}")
+        raise subprocess.CalledProcessError(process.returncode, full_command, output=process.stdout, stderr=process.stderr)
     
     return process
 
