@@ -132,9 +132,16 @@ def main(stdscr):
     deps = [
         "curl", "git", "build-essential", "python3-full", "python3-venv", "nodejs",
         "xserver-xorg", "x11-xserver-utils", "xinit", "openbox", "firefox", 
-        "unclutter", "dbus-x11", "fonts-freefont-ttf", "fonts-noto-core"
+        "unclutter", "dbus-x11", "fonts-freefont-ttf", "fonts-noto-core", "console-setup",
+        "fonts-terminus"
     ]
     run_command(f"sudo apt install -y {' '.join(deps)}")
+
+    engine.log("Configuring console for Unicode support...")
+    run_command("sudo sed -i 's/CHARMAP=.*/CHARMAP=\"UTF-8\"/' /etc/default/console-setup")
+    run_command("sudo sed -i 's/FONTFACE=.*/FONTFACE=\"Terminus\"/' /etc/default/console-setup")
+    run_command("sudo sed -i 's/FONTSIZE=.*/FONTSIZE=\"16x32\"/' /etc/default/console-setup")
+    run_command("printf '\\033%%G' > /dev/tty1")
 
     # --- App Setup ---
     if not os.path.exists(repo_dir):
@@ -171,6 +178,9 @@ def main(stdscr):
     
     bash_profile = f"""
 export TERM=xterm-256color
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+printf '\\033%%G'
 if [[ -z $DISPLAY && $(tty) = /dev/tty1 ]]; then
     {venv_dir}/bin/python {repo_dir}/misc/boot.py
 fi
