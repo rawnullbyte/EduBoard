@@ -257,14 +257,18 @@ hwaccel
     
     kiosk_service_content = f"""[Unit]
 Description=EduBoard Kiosk (Cage) on TTY2
-After=network.target EduBoard.service seatd.service
+After=network.target EduBoard.service seatd.service kmsconvt@tty1.service
 Requires=EduBoard.service seatd.service
 Conflicts=getty@tty2.service
+After=kmsconvt@tty1.service
+StartLimitBurst=3
+StartLimitIntervalSec=10
 
 [Service]
 User={username}
 Group={username}
 PAMName=login
+
 Environment=WLR_BACKENDS=drm
 Environment=XDG_RUNTIME_DIR=/run/user/%U
 Environment=WAYLAND_DISPLAY=wayland-0
@@ -272,11 +276,24 @@ Environment=LIBSEAT_BACKEND=seatd
 Environment=WLR_LIBINPUT_NO_DEVICES=1
 Environment=WLR_NO_HARDWARE_CURSORS=1
 
-ExecStartPre=/bin/bash -c 'until [ "$(curl -s -o /dev/null -w "%%{{http_code}}" http://localhost:8000)" -eq 200 ]; do sleep 1; done; sleep 3'
+TTYPath=/dev/tty2
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+UtmpIdentifier=tty2
+UtmpMode=user
+
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+
+ExecStartPre=/bin/bash -c 'until [ "$(curl -s -o /dev/null -w "%%{{http_code}}" http://localhost:8000)" -eq 200 ]; do sleep 1; done; sleep 2'
 ExecStart=/usr/bin/cage -s -- /usr/bin/firefox-esr --kiosk http://localhost:8000
 
 Restart=always
-RestartSec=5
+RestartSec=8
+StartLimitBurst=5
+StartLimitIntervalSec=60
 
 [Install]
 WantedBy=multi-user.target
