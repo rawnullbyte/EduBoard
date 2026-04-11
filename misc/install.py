@@ -11,9 +11,7 @@ def run_command(command, user=None, cwd=None, env=None, log_callback=None):
     custom_env = os.environ.copy()
     custom_env["DEBIAN_FRONTEND"] = "noninteractive"
     custom_env["TERM"] = "xterm-256color" 
-    if env:
-        custom_env.update(env)
-
+    
     directory = cwd if cwd else "."
     setup_env = "export TERM=xterm-256color DEBIAN_FRONTEND=noninteractive LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 && "
     
@@ -40,34 +38,27 @@ def run_command(command, user=None, cwd=None, env=None, log_callback=None):
 
 def write_file(path, content, user=None, mode=0o644):
     path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
+    run_command(f"sudo mkdir -p {path.parent}")
+    temp_path = f"/tmp/{path.name}.tmp"
+    with open(temp_path, "w") as f:
         f.write(content)
+    run_command(f"sudo mv {temp_path} {path}")
     if user:
-        pw = pwd.getpwnam(user)
-        os.chown(path, pw.pw_uid, pw.pw_gid)
-    os.chmod(path, mode)
+        run_command(f"sudo chown {user}:{user} {path}")
+    run_command(f"sudo chmod {mode:o} {path}")
 
 def set_hostname(hostname, log_callback=None):
     try:
         run_command(f"sudo hostnamectl set-hostname {hostname}")
         write_file("/etc/hostname", f"{hostname}\n")
-        with open("/etc/hosts", "r") as f:
-            hosts_content = f.read()
-        
-        lines = hosts_content.split('\n')
-        new_lines = [line if '127.0.1.1' not in line else f"127.0.1.1\t{hostname}" for line in lines]
-        if not any('127.0.1.1' in line for line in new_lines):
-            new_lines.insert(1, f"127.0.1.1\t{hostname}")
-        
-        write_file("/etc/hosts", '\n'.join(new_lines))
+        run_command(f"sudo sed -i 's/127.0.1.1.*/127.0.1.1\t{hostname}/g' /etc/hosts")
         return True
     except Exception as e:
         if log_callback: log_callback(f"Failed hostname: {str(e)}")
         return False
 
 def main(stdscr):
-    # --- ALL ANIMATIONS PRESERVED ---
+    # --- ANIMATIONS RESTORED ---
     engine = AnimationEngine(stdscr)
     engine.set_ascii(logo_ascii)
     engine.animate_ascii_move(duration=3, direction="up")
@@ -82,82 +73,70 @@ def main(stdscr):
     screen_id = engine.ask("Screen ID: ", "1") or "1"
     password = engine.ask("Password: ", "123456") or "123456"
 
-    home_dir, repo_dir, venv_dir = f"/home/{username}", f"/home/{username}/EduBoard", f"/home/{username}/venv"
+    home_dir = f"/home/{username}"
+    repo_dir = f"{home_dir}/EduBoard"
+    venv_dir = f"{home_dir}/venv"
 
-    # --- System Setup ---
+    # --- User Setup ---
     set_hostname(hostname, engine.log)
     try:
         pwd.getpwnam(username)
-        engine.log(f"User {username} exists.")
     except KeyError:
         run_command(f"sudo adduser --disabled-password --gecos '' {username}", log_callback=engine.log)
+        run_command(f"echo '{username}:{password}' | sudo chpasswd")
     
-    run_command(f"sudo usermod -aG video,audio,input,tty,render {username}", log_callback=engine.log)
+    run_command(f"sudo usermod -aG video,audio,input,tty,render,sudo {username}", log_callback=engine.log)
 
-    # --- Dependencies & KMSCON ---
-    engine.log("Installing Node 22 and Unicode Terminal...")
+    # --- Dependencies ---
+    engine.log("Installing Dependencies...")
     run_command("curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -", log_callback=engine.log)
     run_command("sudo apt update", log_callback=engine.log)
-    deps = [
-        "curl", "git", "build-essential", "python3-full", "python3-venv", "nodejs",
-        "xserver-xorg", "xinit", "openbox", "firefox", "kmscon", 
-        "fonts-symbola", "fonts-noto-core", "fonts-dejavu-core"
-    ]
+    deps = ["curl", "git", "python3-full", "python3-venv", "nodejs", "kmscon", "fonts-symbola", "fonts-noto-core"]
     run_command(f"sudo apt install -y {' '.join(deps)}", log_callback=engine.log)
-
-    engine.log("Generating Locales...")
-    run_command("sudo locale-gen en_US.UTF-8", log_callback=engine.log)
-    run_command("sudo update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8", log_callback=engine.log)
 
     # --- App Setup ---
     if not os.path.exists(repo_dir):
-        run_command(f"git clone https://github.com/rawnullbyte/EduBoard.git {repo_dir}", user=username, log_callback=engine.log)
+        run_command(f"sudo -u {username} git clone https://github.com/rawnullbyte/EduBoard.git {repo_dir}", log_callback=engine.log)
     
     write_file(f"{repo_dir}/.env", f"SCHOOL_SUBDOMAIN={subdomain}\nSCREEN_ID={screen_id}\nPASSWORD={password}\n", user=username)
-
-    engine.log("Setting up Python Venv...")
     run_command(f"python3 -m venv {venv_dir}", user=username, log_callback=engine.log)
-    run_command(f"{venv_dir}/bin/pip install --upgrade pip", user=username, log_callback=engine.log)
     run_command(f"{venv_dir}/bin/pip install -r requirements.txt", user=username, cwd=repo_dir, log_callback=engine.log)
-
-    engine.log("Building Frontend...")
     run_command("npm install && npm run build", user=username, cwd=f"{repo_dir}/frontend", log_callback=engine.log)
 
-    # --- Shell Logic (Broadened to catch pts/0) ---
-    bash_profile = f"""
+    # --- BASH PROFILE (Triggers Script) ---
+    shell_content = f"""
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
-export LANGUAGE=en_US.UTF-8
-
-CURRENT_TTY=$(tty)
-if [[ "$CURRENT_TTY" == "/dev/tty1" || "$CURRENT_TTY" == "/dev/pts/0" ]]; then
+# Catch physical TTY or VM pts/0
+if [[ $(tty) == "/dev/tty1" || $(tty) == "/dev/pts/0" ]]; then
     exec {venv_dir}/bin/python {repo_dir}/misc/boot.py
 fi
 """
-    write_file(f"{home_dir}/.bash_profile", bash_profile, user=username)
+    write_file(f"{home_dir}/.bash_profile", shell_content, user=username)
     write_file(f"{home_dir}/.bashrc", "[[ -f ~/.bash_profile ]] && . ~/.bash_profile\n", user=username)
 
-    # --- KMSCON Service (The "Real Shell" Fix) ---
-    # We apply this to both standard tty and serial to be safe for VMs
+    # --- KMSCON + AUTOLOGIN OVERRIDE ---
+    # We use 'StandardOutput=tty' to ensure it takes over the physical screen
     kms_config = f"""[Service]
 ExecStart=
-ExecStart=-/usr/bin/kmscon --login --vt vt1 --allow-keyboard --font-name "Monospace" --font-size 14 --autologin {username} -- /bin/bash --login
+ExecStart=-/usr/bin/kmscon --login --vt vt1 --allow-keyboard --font-size 14 --autologin {username} -- /bin/bash --login
+StandardInput=tty
+StandardOutput=tty
 Environment=LANG=en_US.UTF-8
 Environment=LC_ALL=en_US.UTF-8
 """
+    # Override for standard TTY1
     os.makedirs("/etc/systemd/system/getty@tty1.service.d", exist_ok=True)
     write_file("/etc/systemd/system/getty@tty1.service.d/override.conf", kms_config)
     
-    # Force auto-login on serial consoles (common for VMs showing pts/0)
+    # Override for serial/VM console
     os.makedirs("/etc/systemd/system/serial-getty@ttyS0.service.d", exist_ok=True)
     write_file("/etc/systemd/system/serial-getty@ttyS0.service.d/override.conf", kms_config)
 
-    engine.log("Disabling graphical login manager...")
+    engine.log("Setting boot target and finalizing...")
     run_command("sudo systemctl set-default multi-user.target", log_callback=engine.log)
-
-    engine.log("Finalizing...")
-    run_command("sudo systemctl daemon-reload", log_callback=engine.log)
-    run_command("sleep 3 && sudo reboot", log_callback=engine.log)
+    run_command("sudo systemctl daemon-reload")
+    run_command("sleep 3 && sudo reboot")
 
 if __name__ == "__main__":
     curses.wrapper(main)
