@@ -214,6 +214,7 @@ PASSWORD={password}
     
     kmscon_conf_content = """font-name=DejaVu Sans Mono, WenQuanYi Micro Hei Mono
 font-size=14
+term=xterm-256color
 hwaccel
 """
     write_file("/etc/kmscon/kmscon.conf", kmscon_conf_content)
@@ -223,7 +224,7 @@ hwaccel
     override_dir = "/etc/systemd/system/kmsconvt@tty1.service.d"
     override_content = f"""[Service]
 ExecStart=
-ExecStart=/usr/libexec/kmscon/kmscon --vt=%I --seats=seat0 --configdir /etc/kmscon --login -- /bin/login -p -f {username} {venv_dir}/bin/python {repo_dir}/misc/boot.py
+ExecStart=/usr/libexec/kmscon/kmscon --vt=%I --seats=seat0 --configdir /etc/kmscon -- /bin/su -l {username} -c "exec {venv_dir}/bin/python {repo_dir}/misc/boot.py"
 """
     write_file(f"{override_dir}/override.conf", override_content)
     engine.log(f"✓ Auto-login configured for user '{username}'")
