@@ -45,6 +45,9 @@ class AnimationEngine:
             curses.init_pair(11, 8, -1) 
         except curses.error: pass
 
+    def clear_logs(self):
+        self.logs = []
+
     def log(self, text):
         self.logs.append(f"[{time.strftime('%H:%M:%S')}] {text}")
         if len(self.logs) > 500: self.logs.pop(0)

@@ -22,6 +22,7 @@ def main(stdscr):
 
     engine.sleep(3)
 
+    engine.clear_logs()
     engine.set_ascii(logo_ascii)
     engine.animate_ascii_move(duration=3, direction="up")
     engine.sleep(1)
