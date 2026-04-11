@@ -249,7 +249,7 @@ EndSection
 
     env_content = f"""SCHOOL_SUBDOMAIN={subdomain}
 SCREEN_ID={screen_id}
-    PASSWORD={password}
+PASSWORD={password}
 DISPLAY=:0
 """
     write_file(f"{repo_dir}/.env", env_content, user=username)
