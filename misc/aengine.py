@@ -251,7 +251,8 @@ class AnimationEngine:
             for i, line in enumerate(display):
                 try: 
                     if i < max_lines:
-                        self.stdscr.addstr(start_y + 1 + i, start_x + 2, line[:win_w-4], curses.color_pair(10))
+                        #self.stdscr.addstr(start_y + 1 + i, start_x + 2, line[:win_w-4], curses.color_pair(10))
+                        self.stdscr.addstr(start_y + 1 + i, start_x + 2, line, curses.color_pair(10))
                 except: pass
 
     def _render_loop(self):

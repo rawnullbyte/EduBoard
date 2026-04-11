@@ -6,6 +6,10 @@ from aengine import AnimationEngine
 from logo import text as logo_ascii
 import curses
 
+
+import subprocess
+import os
+
 def run_command(command, user=None, cwd=None, env=None, log_callback=None):
     custom_env = os.environ.copy()
     custom_env["DEBIAN_FRONTEND"] = "noninteractive"
@@ -13,27 +17,31 @@ def run_command(command, user=None, cwd=None, env=None, log_callback=None):
         custom_env.update(env)
 
     if user:
-        command = f"sudo -u {user} {command}"
-    
+        directory = cwd if cwd else "."
+        full_command = f"sudo -u {user} -i bash -c 'cd {directory} && {command}'"
+    else:
+        full_command = command
+
     process = subprocess.Popen(
-        command,
+        full_command,
         shell=True,
         executable="/bin/bash",
-        cwd=cwd,
         env=custom_env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-        bufsize=1
+        bufsize=1,
+        universal_newlines=True
     )
 
     for line in iter(process.stdout.readline, ''):
-        if log_callback:
-            log_callback(line.strip())
+        clean_line = line.strip()
+        if clean_line and log_callback:
+            log_callback(clean_line)
             
     return_code = process.wait()
     if return_code != 0:
-        raise subprocess.CalledProcessError(return_code, command)
+        raise subprocess.CalledProcessError(return_code, full_command)
 
 def write_file(path, content, user=None, mode=0o644):
     """Writes content to a file and sets ownership/permissions."""
