@@ -1,6 +1,10 @@
+import asyncio
+import subprocess
+
 from dotenv import load_dotenv
 from datetime import datetime
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
@@ -9,8 +13,6 @@ import httpx
 import os
 
 load_dotenv()
-
-app = FastAPI()
 
 class EduBoard:
     def __init__(self):
@@ -132,6 +134,8 @@ class EduBoard:
         )
         
         response_data = r.json()
+
+        if response_data.get("r").get("ttitems") == []: return {}
         
         if "r" in response_data and "rows" in response_data["r"]:
             parsed_data = {
@@ -227,8 +231,63 @@ class EduBoard:
                 
         return data
 
-# Class instance
+class ScreenManager():
+    def __init__(self, edub_instance):
+        self.edub = edub_instance
+
+    def set_screen(self, state: bool):
+        cmd = "on" if state else "off"
+        try:
+            subprocess.run(["wlopm", f"--{cmd}", "*"], check=True)
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] wlopm --{cmd} '*'")
+        except Exception as e:
+            print(f"Error controlling screen: {e}")
+
+    async def screen_timer_loop(self):
+        while True:
+            try:
+                tt_data = self.edub.fetchTimetableData()
+                rows = tt_data.get("r", {}).get("rows", [])
+                
+                all_items = []
+                for row in rows:
+                    all_items.extend(row.get("ttitems", []))
+                
+                if not all_items:
+                    self.set_screen(False)
+                else:
+                    now_str = datetime.now().strftime("%H:%M")
+                    is_in_class = any(item['starttime'] <= now_str < item['endtime'] for item in all_items)
+                    
+                    school_start = min(item['starttime'] for item in all_items)
+                    school_end = max(item['endtime'] for item in all_items)
+                    
+                    self.set_screen((school_start <= now_str < school_end) and not is_in_class)
+            except Exception as e:
+                print(f"Timer Loop Error: {e}")
+            
+            await asyncio.sleep(60)
+
+# Class instances
 edub = EduBoard()
+screenmgr = ScreenManager(edub)
+
+# Screen manager
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(screenmgr.screen_timer_loop())
+    print("Screen manager background task started.")
+    
+    yield
+    
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        print("Screen manager background task stopped.")
+
+# Initialize FastAPI
+app = FastAPI(lifespan=lifespan)
 
 # Api endpoints
 @app.get("/api/data")

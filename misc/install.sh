@@ -30,7 +30,7 @@ sudo apt update && sudo apt upgrade -y
 curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
 sudo apt install -y curl git build-essential python3-full python3-venv nodejs \
     xserver-xorg x11-xserver-utils xinit openbox firefox unclutter dbus-x11 \
-    fonts-freefont-ttf fonts-noto-core fbterm
+    fonts-freefont-ttf fonts-noto-core fbterm wlopm
 
 # Refresh font cache and allow fbterm to access the TTY
 sudo fc-cache -fv
