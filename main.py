@@ -128,7 +128,7 @@ class EduBoard:
     def fetchInfoscreenEventsData(self):
         r = httpx.post(
             f"https://{self.SCHOOL_SUBDOMAIN}.edupage.org/infoscreen/server/infoscreens.js?__func=getInfoscreenEventsData",
-            json={"__args":[None,"5",{"date":"2026-04-10"}],"__gsh":"00000000"},
+            json={"__args":[None,"5",{"date":"2026-04-10"}],"__gsh":"00000000"},  # {"date":datetime.now().strftime('%Y-%m-%d')}
             cookies=self.cookies,
             headers=self.headers
         )
@@ -198,7 +198,7 @@ class EduBoard:
     def fetchTimetableData(self):
         r = httpx.post(
             f"https://{self.SCHOOL_SUBDOMAIN}.edupage.org/infoscreen/server/infoscreens.js?__func=getInfoscreenTimetableData",
-            json={"__args":[None,"1",{"date":"2026-04-10"}],"__gsh":"00000000"},
+            json={"__args":[None,"1",{"date":"2026-04-10"}],"__gsh":"00000000"}, # {"date":datetime.now().strftime('%Y-%m-%d')}
             cookies=self.cookies,
             headers=self.headers
         )
