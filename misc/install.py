@@ -120,7 +120,7 @@ def main(stdscr):
     packages = [
         "curl", "git", "python3-full", "python3-venv", "nodejs",
         "fonts-symbola", "fonts-noto-core", "fonts-dejavu", "fonts-wqy-microhei",
-        "kmscon", "sway", "firefox-esr", "wlr-randr", "seatd", "swaybg"
+        "kmscon", "sway", "firefox-esr", "wlr-randr", "seatd", "swaybg", "ufw"
     ]
     package_list = " ".join(packages)
     engine.log(f" Installing dependencies... (This may take a while!)")
@@ -227,7 +227,7 @@ bar {{
     swaybar_command :
 }}
 
-exec swaybg -c "#000000" &
+exec swaybg -i {repo_dir}/misc/wallpaper.png -m fill &
 exec firefox-esr --kiosk http://localhost:8000
 for_window [app_id="firefox"] fullscreen global
 bindsym Mod4+Shift+q kill
@@ -288,6 +288,17 @@ ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/km
 """
     write_file(f"{override_dir}/override.conf", override_content)
     engine.log(f"✓ KMSCON configured for user '{username}' on tty1")
+
+    engine.log("")
+    engine.log("→ Configuring UFW firewall...")
+    run_command("sudo ufw default deny incoming", log_callback=engine.log)
+    run_command("sudo ufw default allow outgoing", log_callback=engine.log)
+    engine.log(" Allowing SSH on port 22...")
+    run_command("sudo ufw allow 22/tcp comment 'SSH'", log_callback=engine.log)
+    engine.log(" Enabling UFW firewall...")
+    run_command("echo 'y' | sudo ufw enable", log_callback=engine.log)
+    run_command("sudo ufw reload", log_callback=engine.log)
+    ngine.log("✓ UFW firewall configured and enabled")
 
     engine.log(" Disabling conflicting terminal services...")
     run_command("sudo systemctl mask getty@tty1.service")
