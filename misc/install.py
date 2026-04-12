@@ -252,7 +252,7 @@ ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/km
     engine.log(" Enabling UFW firewall...")
     run_command("echo 'y' | sudo ufw enable", log_callback=engine.log)
     run_command("sudo ufw reload", log_callback=engine.log)
-    ngine.log("✓ UFW firewall configured and enabled")
+    engine.log("✓ UFW firewall configured and enabled")
 
     engine.log(" Disabling conflicting terminal services...")
     run_command("sudo systemctl mask getty@tty1.service")
