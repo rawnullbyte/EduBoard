@@ -227,7 +227,7 @@ bar {{
     swaybar_command :
 }}
 
-output * bg {repo_dir}/misc/wallpaper.png fill
+exec swaybg -c "#000000" &
 exec firefox-esr --kiosk http://localhost:8000
 for_window [app_id="firefox"] fullscreen global
 bindsym Mod4+Shift+q kill
@@ -235,51 +235,6 @@ bindsym Ctrl+Alt+Delete exec swaymsg exit   # emergency exit to tty
 """
     write_file(f"{home_dir}/.config/sway/config", sway_config_content, user=username)
     engine.log("✓ Sway kiosk config written")
-
-    engine.log("→ Creating Kiosk service for TTY2...")
-    kiosk_service_content = f"""[Unit]
-Description=EduBoard Kiosk (Sway) on TTY2
-After=network.target EduBoard.service seatd.service kmsconvt@tty1.service
-Requires=EduBoard.service seatd.service
-Conflicts=getty@tty2.service
-After=kmsconvt@tty1.service
-
-[Service]
-User={username}
-Group={username}
-PAMName=login
-WorkingDirectory={home_dir}
-
-Environment=WLR_BACKENDS=drm
-Environment=XDG_RUNTIME_DIR=/run/user/%U
-Environment=WAYLAND_DISPLAY=wayland-0
-Environment=LIBSEAT_BACKEND=seatd
-Environment=WLR_LIBINPUT_NO_DEVICES=1
-Environment=WLR_NO_HARDWARE_CURSORS=1
-Environment=XDG_SESSION_TYPE=wayland
-Environment=XDG_CURRENT_DESKTOP=sway
-
-TTYPath=/dev/tty2
-TTYReset=yes
-TTYVHangup=yes
-TTYVTDisallocate=yes
-UtmpIdentifier=tty2
-UtmpMode=user
-StandardInput=tty
-StandardOutput=journal
-StandardError=journal
-
-ExecStartPre=/bin/bash -c 'until [ "$(curl -s -o /dev/null -w "%%{{http_code}}" http://localhost:8000)" -eq 200 ]; do sleep 1; done; sleep 2'
-ExecStart=/usr/bin/sway
-
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-"""
-    write_file("/etc/systemd/system/kiosk.service", kiosk_service_content)
-    engine.log("✓ Kiosk service (Sway) created!")
 
     override_dir = "/etc/systemd/system/kmsconvt@tty1.service.d"
     override_content = f"""[Service]
