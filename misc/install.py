@@ -268,7 +268,6 @@ ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/km
     engine.log("→ Finalizing installation...")
     run_command("sudo systemctl daemon-reload")
     run_command("sudo systemctl enable EduBoard", log_callback=engine.log)
-    run_command("sudo systemctl enable kiosk", log_callback=engine.log)
     run_command("sudo systemctl enable seatd", log_callback=engine.log)
     run_command(f"sudo loginctl enable-linger {username}", log_callback=engine.log)
 
