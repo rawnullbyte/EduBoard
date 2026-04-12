@@ -67,10 +67,7 @@ def main(stdscr):
 
     wallpaper_path = f"{os.getenv('HOME')}/EduBoard/misc/wallpaper.png"
     engine.log("→ Setting wallpaper...")
-    if os.path.exists(wallpaper_path):
-        subprocess.run(["swaybg", "-i", wallpaper_path, "-m", "fill"], env=env)
-    else:
-        subprocess.run(["swaybg", "-c", "#000000"], env=env)
+    subprocess.run(["swaymsg", "output", '"*"', "bg", wallpaper_path, "fill"], env=env)
 
     time.sleep(0.8)
 
