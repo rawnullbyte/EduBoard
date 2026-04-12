@@ -67,7 +67,7 @@ def main(stdscr):
     # Start Sway
     engine.log("→ Launching Sway...")
     try:
-        subprocess.run(["sway"], env=env, check=True)
+        subprocess.run("sway -d > ~/sway.log 2>&1", env=env, check=True, shell=True)
     except Exception as e:
         engine.log(f"✗ Failed to start Sway: {e}")
         time.sleep(10)
