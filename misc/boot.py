@@ -17,8 +17,8 @@ def main(stdscr):
         for line in result.stdout.splitlines():
             if line.strip():
                 engine.log(line)
-    except Exception as e:
-        engine.log(f"fastfetch error: {e}")
+    except:
+        pass
 
     engine.sleep(3)
     engine.clear_logs()
@@ -28,10 +28,12 @@ def main(stdscr):
     engine.sleep(1)
     engine.animate_ascii_move(duration=3, direction="out")
 
-    engine.log("→ Switching to tty2 and starting Sway...")
+    engine.log("→ Switching to tty2...")
 
     subprocess.run(["sudo", "chvt", "2"])
+    time.sleep(1.5)
 
+    # Environment for Sway
     env = os.environ.copy()
     env.update({
         "WLR_BACKENDS": "drm",
@@ -44,8 +46,20 @@ def main(stdscr):
         "XDG_CURRENT_DESKTOP": "sway",
     })
 
+    wallpaper_path = f"{os.getenv('HOME')}/EduBoard/misc/wallpaper.png"
+
+    engine.log("→ Setting wallpaper...")
+
+    if os.path.exists(wallpaper_path):
+        subprocess.run(["swaybg", "-i", wallpaper_path, "-m", "fill"], env=env)
+    else:
+        subprocess.run(["swaybg", "-c", "#000000"], env=env)
+
+    time.sleep(0.8)
+
+    # Start Sway
+    engine.log("→ Launching Sway...")
     try:
-        engine.log("→ Launching Sway...")
         subprocess.run(["sway"], env=env, check=True)
     except Exception as e:
         engine.log(f"✗ Failed to start Sway: {e}")
