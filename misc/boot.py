@@ -53,10 +53,10 @@ def main(stdscr):
     subprocess.run(["sudo", "chvt", "2"])
 
     env = os.environ.copy()
+    env.pop("WAYLAND_DISPLAY", None)
     env.update({
         "WLR_BACKENDS": "drm",
         "XDG_RUNTIME_DIR": f"/run/user/{os.getuid()}",
-        "WAYLAND_DISPLAY": "wayland-0",
         "LIBSEAT_BACKEND": "seatd",
         "WLR_LIBINPUT_NO_DEVICES": "1",
         "WLR_NO_HARDWARE_CURSORS": "1",
