@@ -1,45 +1,64 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 
+// ─── config ───────────────────────────────────────────────────────────────────
 const CYCLE_TIME = 12
 const REFRESH_INTERVAL = 60
-const ROWS_PER_PAGE = 4   // 4 classes per page for TV readability
+const ROWS_PER_PAGE = 6
 
-// ─── colour: extract hue for left-border accent only, keep bg near-black ─────
-function parseRGB(raw) {
+// ─── colour utilities ─────────────────────────────────────────────────────────
+
+function parseRGBA(raw) {
   if (!raw) return null
   const s = raw.trim()
   if (s.startsWith('#')) {
-    const h = s.replace('#', '').padEnd(6, '0')
-    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]
+    const h = s.replace('#', '')
+    const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h.padEnd(6, '0')
+    return [parseInt(full.slice(0, 2), 16), parseInt(full.slice(2, 4), 16), parseInt(full.slice(4, 6), 16), 1]
   }
   const m = s.match(/rgba?\(([^)]+)\)/)
   if (m) {
     const p = m[1].split(',').map(x => parseFloat(x.trim()))
-    return [p[0] ?? 0, p[1] ?? 0, p[2] ?? 0]
+    return [p[0] ?? 0, p[1] ?? 0, p[2] ?? 0, p[3] ?? 1]
   }
   return null
 }
 
-// Subtle bg: 10% hue blended into near-black
-function subtleBg(raw) {
-  const c = parseRGB(raw)
-  if (!c) return '#1a1d26'
+// Very subtle hue tint blended toward the dark surface — readable, not garish
+function cellBg(raw) {
+  const c = parseRGBA(raw)
+  if (!c) return null
   const [r, g, b] = c
-  return `rgb(${Math.round(r * .10 + 18 * .90)},${Math.round(g * .10 + 19 * .90)},${Math.round(b * .10 + 26 * .90)})`
+  // blend 12% colour into the dark card background
+  return `rgb(${Math.round(r * .12 + 22 * .88)},${Math.round(g * .12 + 26 * .88)},${Math.round(b * .12 + 36 * .88)})`
 }
 
-// Vivid-ish accent for left border: 70% hue but desaturated toward mid-grey
-function accentColor(raw) {
-  const c = parseRGB(raw)
-  if (!c) return '#3a5f9a'
+// Left-border accent — 45% saturation so it's visible but not neon
+function cellAccent(raw) {
+  const c = parseRGBA(raw)
+  if (!c) return null
   const [r, g, b] = c
-  // desaturate 30% then clamp brightness so it's visible but not neon
-  const avg = (r + g + b) / 3
-  const dr = r * .7 + avg * .3, dg = g * .7 + avg * .3, db = b * .7 + avg * .3
-  // scale so max channel = 180 (avoids blinding white-ish colours)
-  const max = Math.max(dr, dg, db, 1)
-  const scale = Math.min(1, 180 / max)
-  return `rgb(${Math.round(dr * scale)},${Math.round(dg * scale)},${Math.round(db * scale)})`
+  return `rgb(${Math.round(r * .45 + 22 * .55)},${Math.round(g * .45 + 26 * .55)},${Math.round(b * .45 + 36 * .55)})`
+}
+
+// ─── design tokens ────────────────────────────────────────────────────────────
+const t = {
+  bg: '#0f1117',
+  bgCard: '#171a24',
+  bgCardHi: '#1c2032',
+  surface: '#242840',
+  surfaceVar: '#2a2e46',
+  primary: '#82aadf',
+  primaryDim: '#3d5c87',
+  outline: '#353a55',
+  outlineVar: '#272b40',
+  onSurface: '#dde0ef',
+  onSurfaceMid: '#7b82a0',
+  onSurfaceDim: '#474d68',
+  error: '#ef9a9a',
+  errorDim: 'rgba(120,40,40,0.6)',
+  warn: '#f0c070',
+  warnDim: 'rgba(100,70,0,0.6)',
+  r: { sm: 8, md: 10, lg: 14, xl: 18 },
 }
 
 // ─── lookup helpers ───────────────────────────────────────────────────────────
@@ -66,141 +85,108 @@ async function fetchAll() {
   }
 }
 
-// ─── tokens ───────────────────────────────────────────────────────────────────
-// Pure white on pure black — maximum TV contrast
-const C = {
-  bg: '#0d0f14',
-  bgCard: '#13161f',
-  bgCardHi: '#181c28',
-  surface: '#1e2235',
-  white: '#ffffff',
-  bright: '#e8ecff',   // slightly warm white for body
-  mid: '#8890b0',   // secondary text — still readable from distance
-  dim: '#454a65',   // tertiary / decorative
-  blue: '#6fa3e8',   // primary accent
-  blueDim: '#2a4a7a',
-  red: '#ff6b6b',
-  redDim: '#5c1a1a',
-  amber: '#ffcc44',
-  amberDim: '#4a3000',
-  green: '#66cc88',
-  border: '#252840',
+// ─── shared style fragments ───────────────────────────────────────────────────
+const S = {
+  app: {
+    display: 'flex', flexDirection: 'column', height: '100vh',
+    background: t.bg, color: t.onSurface, overflow: 'hidden',
+    fontFamily: "'DM Sans','Segoe UI',system-ui,sans-serif",
+  },
+  progressTrack: { height: 3, background: t.outline, flexShrink: 0 },
+  progressFill: (pct) => ({ height: '100%', background: t.primary, width: `${pct}%`, transition: 'width 100ms linear' }),
+  appBar: {
+    display: 'flex', alignItems: 'center', gap: 14, padding: '9px 16px',
+    background: t.bgCard, borderBottom: `1px solid ${t.outline}`, flexShrink: 0,
+  },
+  cell: (color) => ({
+    borderRadius: t.r.md,
+    background: cellBg(color) ?? t.bgCardHi,
+    borderLeft: `3px solid ${cellAccent(color) ?? t.primaryDim}`,
+    padding: '5px 8px',
+    display: 'flex', flexDirection: 'column', justifyContent: 'center',
+    overflow: 'hidden', gap: 2,
+  }),
+  subjectText: {
+    fontSize: 'clamp(9px,1.3vw,14px)', fontWeight: 700,
+    textTransform: 'uppercase', color: t.onSurface,
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+    lineHeight: 1.2, letterSpacing: '.02em',
+  },
+  metaText: {
+    fontSize: 9, color: t.onSurfaceMid,
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.4,
+  },
 }
 
-// ─── lesson cell — big, bold, TV-legible ─────────────────────────────────────
+// ─── lesson cell ──────────────────────────────────────────────────────────────
 function LessonCell({ items, lookup, sub }) {
   const card = items.find(i => i.type === 'card')
   const event = items.find(i => i.type === 'event')
 
-  // empty
   if (!card && !event && !sub) return (
-    <div style={{ borderRadius: 12, background: C.bgCard, opacity: .25 }} />
+    <div style={{ borderRadius: t.r.md, background: t.bgCard, opacity: .3 }} />
   )
 
-  // substitution overrides the cell
+  // ── substitution ──
   if (sub) {
     const cancelled = sub.removed || sub.type === 'absence'
-    const accent = cancelled ? C.red : C.amber
-    const accentDim = cancelled ? C.redDim : C.amberDim
     const color = sub.colors?.[0] ?? card?.colors?.[0]
     return (
-      <div style={{
-        borderRadius: 12,
-        background: subtleBg(color),
-        border: `1.5px solid ${accentDim}`,
-        borderLeft: `4px solid ${accent}`,
-        padding: '10px 14px',
-        display: 'flex', flexDirection: 'column', justifyContent: 'center',
-        overflow: 'hidden', gap: 6, position: 'relative',
-      }}>
-        {/* type badge */}
+      <div style={{ ...S.cell(color), position: 'relative' }}>
         <span style={{
-          position: 'absolute', top: 6, right: 8,
-          fontSize: 13, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase',
-          color: accent,
+          position: 'absolute', top: 3, right: 4,
+          fontSize: 8, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase',
+          background: cancelled ? t.errorDim : t.warnDim,
+          color: cancelled ? t.error : t.warn,
+          padding: '1px 5px', borderRadius: 4,
         }}>
-          {cancelled ? '✕ ODPADÁ' : '↔ SUP.'}
+          {cancelled ? 'Odpadá' : 'Sup.'}
         </span>
-
-        <div style={{
-          fontSize: 'clamp(16px,2.2vw,26px)', fontWeight: 800,
-          color: cancelled ? C.mid : C.white,
-          textTransform: 'uppercase', letterSpacing: '.04em',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          paddingRight: 100,
-          textDecoration: cancelled ? 'line-through' : 'none',
-        }}>
+        <div style={{ ...S.subjectText, paddingRight: 30, color: cancelled ? t.onSurfaceMid : t.onSurface }}>
           {cancelled
-            ? (card ? getSubj(lookup, card.subjectid) : '—')
-            : (sub.subjectid ? getSubj(lookup, sub.subjectid) : (card ? getSubj(lookup, card.subjectid) : '—'))
+            ? (card ? getSubj(lookup, card.subjectid) : '–')
+            : (sub.subjectid ? getSubj(lookup, sub.subjectid) : (card ? getSubj(lookup, card.subjectid) : '–'))
           }
         </div>
-
         {!cancelled && (
-          <div style={{ fontSize: 'clamp(13px,1.6vw,19px)', color: C.mid, fontWeight: 500 }}>
+          <div style={S.metaText}>
             {[...(sub.teacherids ?? card?.teacherids ?? [])].map(id => getTeach(lookup, id)).join(', ')}
-            {' · '}
-            {[...(sub.classroomids ?? card?.classroomids ?? [])].map(id => getRoom(lookup, id)).join(', ') || '—'}
+            {(sub.classroomids ?? card?.classroomids ?? []).length > 0 &&
+              ' · ' + (sub.classroomids ?? card?.classroomids ?? []).map(id => getRoom(lookup, id)).join(', ')}
           </div>
         )}
       </div>
     )
   }
 
-  // event (no card)
+  // ── event only ──
   if (!card) return (
     <div style={{
-      borderRadius: 12,
-      background: subtleBg(event.colors?.[0]),
-      borderLeft: `4px solid ${accentColor(event.colors?.[0])}`,
-      border: `1.5px solid ${C.border}`,
-      borderLeft: `4px solid ${accentColor(event.colors?.[0])}`,
-      padding: '10px 14px',
-      display: 'flex', alignItems: 'center', overflow: 'hidden',
+      borderRadius: t.r.md,
+      background: cellBg(event.colors?.[0]) ?? t.surface,
+      borderLeft: `3px solid ${cellAccent(event.colors?.[0]) ?? t.primaryDim}`,
+      padding: '4px 7px', display: 'flex', alignItems: 'center', overflow: 'hidden',
     }}>
-      <span style={{
-        fontSize: 'clamp(13px,1.6vw,18px)', fontWeight: 600, color: C.mid, lineHeight: 1.35,
-        display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-      }}>
+      <span style={{ fontSize: 9, color: t.onSurfaceMid, lineHeight: 1.3 }}>
         {(event.name ?? '').split(':').pop().trim()}
       </span>
     </div>
   )
 
-  // regular card
+  // ── regular card ──
   const rooms = (card.classroomids ?? []).map(id => getRoom(lookup, id)).join(', ')
   const teachers = (card.teacherids ?? []).map(id => getTeach(lookup, id)).join(', ')
-  const accent = accentColor(card.colors?.[0])
-
   return (
-    <div style={{
-      borderRadius: 12,
-      background: subtleBg(card.colors?.[0]),
-      border: `1.5px solid ${C.border}`,
-      borderLeft: `4px solid ${accent}`,
-      padding: '10px 14px',
-      display: 'flex', flexDirection: 'column', justifyContent: 'center',
-      overflow: 'hidden', gap: 5,
-    }}>
-      <div style={{
-        fontSize: 'clamp(18px,2.4vw,30px)', fontWeight: 800,
-        color: C.white, textTransform: 'uppercase', letterSpacing: '.04em',
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        lineHeight: 1.1,
-      }}>
-        {getSubj(lookup, card.subjectid)}
-      </div>
-      <div style={{
-        fontSize: 'clamp(13px,1.6vw,20px)', color: C.mid, fontWeight: 500,
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      }}>
-        {[rooms, teachers].filter(Boolean).join('  ·  ')}
+    <div style={S.cell(card.colors?.[0])}>
+      <div style={S.subjectText}>{getSubj(lookup, card.subjectid)}</div>
+      <div style={S.metaText}>
+        {[rooms, teachers].filter(Boolean).join(' · ')}
       </div>
     </div>
   )
 }
 
-// ─── timetable ────────────────────────────────────────────────────────────────
+// ─── timetable view ───────────────────────────────────────────────────────────
 function TimetableView({ rows, lookup, subs }) {
   const periods = getPeriods(lookup)
 
@@ -219,36 +205,33 @@ function TimetableView({ rows, lookup, subs }) {
 
   return (
     <div style={{
-      flex: 1, display: 'grid', gap: 8, overflow: 'hidden',
-      gridTemplateColumns: `160px repeat(${periods.length},1fr)`,
-      gridTemplateRows: `52px repeat(${rows.length},1fr)`,
+      flex: 1, display: 'grid', gap: 5, overflow: 'hidden',
+      gridTemplateColumns: `minmax(44px,60px) repeat(${periods.length},1fr)`,
+      gridTemplateRows: `38px repeat(${rows.length},1fr)`,
     }}>
-      {/* corner */}
-      <div style={{ borderRadius: 12, background: C.bgCard }} />
+      <div style={{ borderRadius: t.r.md, background: t.bgCard }} />
 
-      {/* period headers */}
       {periods.map(p => (
         <div key={p.period} style={{
-          background: C.surface, borderRadius: 12,
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+          background: t.surface, borderRadius: t.r.md,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          padding: '3px 2px', gap: 1,
         }}>
-          <span style={{ fontSize: 'clamp(18px,2.5vw,32px)', fontWeight: 900, color: C.blue, lineHeight: 1 }}>
+          <span style={{ fontSize: 'clamp(11px,1.5vw,16px)', fontWeight: 700, color: t.primary, lineHeight: 1 }}>
             {p.short}
           </span>
-          <span style={{ fontSize: 'clamp(11px,1.3vw,15px)', color: C.mid, lineHeight: 1.3, textAlign: 'center', fontWeight: 500 }}>
-            {p.start}–{p.end}
+          <span style={{ fontSize: 9, color: t.onSurfaceDim, lineHeight: 1.3, textAlign: 'center' }}>
+            {p.start}<br />{p.end}
           </span>
         </div>
       ))}
 
-      {/* class rows */}
       {rows.map(row => (
         <div key={row.id} style={{ display: 'contents' }}>
           <div style={{
-            borderRadius: 12, background: C.surface,
+            borderRadius: t.r.md, background: t.surface,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 'clamp(20px,2.8vw,38px)', fontWeight: 900,
-            color: C.white, letterSpacing: '-.01em',
+            fontSize: 'clamp(10px,1.4vw,15px)', fontWeight: 700, color: t.primary, letterSpacing: '-.01em',
           }}>
             {getCls(lookup, row.id)}
           </div>
@@ -288,66 +271,59 @@ function SubstitutionsView({ subs, lookup }) {
   }, [subs])
 
   if (!items.length) return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, opacity: .4 }}>
-      <span style={{ fontSize: 52 }}>✓</span>
-      <span style={{ fontSize: 'clamp(18px,2.5vw,28px)', color: C.mid, fontWeight: 600 }}>Dnes žádné suplování</span>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, opacity: .4 }}>
+      <svg width="36" height="36" viewBox="0 0 24 24" fill={t.onSurfaceMid}>
+        <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z" />
+      </svg>
+      <span style={{ fontSize: 14, color: t.onSurfaceMid }}>Dnes žádné suplování</span>
     </div>
   )
 
-  const cols = '80px 140px 1fr 1fr 120px 120px'
+  const cols = 'minmax(36px,44px) minmax(0,1fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) 70px'
 
   return (
-    <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {/* header */}
-      <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 12, padding: '0 20px' }}>
-        {['Hod.', 'Třída', 'Předmět', 'Učitel', 'Učebna', 'Stav'].map(h => (
-          <span key={h} style={{ fontSize: 'clamp(12px,1.4vw,16px)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: C.dim }}>
+    <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 6, padding: '2px 10px' }}>
+        {['Hod.', 'Třída', 'Předmět', 'Učitel', 'Učebna', 'Typ'].map(h => (
+          <span key={h} style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: t.onSurfaceDim }}>
             {h}
           </span>
         ))}
       </div>
-
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden' }}>
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 4 }}>
         {items.map((item, i) => {
           const cancelled = item.removed || item.type === 'absence'
           const period = periodMap[String(item.uniperiod)]
-          const accent = cancelled ? C.red : C.amber
-          const accentDim = cancelled ? C.redDim : C.amberDim
-          const classIds = [item._classId, ...(item.classids ?? [])].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)
-
           return (
             <div key={i} style={{
-              display: 'grid', gridTemplateColumns: cols, gap: 12,
-              background: C.bgCardHi,
-              borderRadius: 12,
-              border: `1.5px solid ${accentDim}`,
-              borderLeft: `5px solid ${accent}`,
-              padding: '14px 20px', alignItems: 'center',
+              display: 'grid', gridTemplateColumns: cols, gap: 6,
+              background: cellBg(item.colors?.[0]) ?? t.bgCardHi,
+              borderRadius: t.r.md,
+              borderLeft: `3px solid ${cancelled ? t.error : (cellAccent(item.colors?.[0]) ?? t.warn)}`,
+              padding: '7px 10px', alignItems: 'center',
             }}>
-              <span style={{ fontSize: 'clamp(20px,2.5vw,30px)', fontWeight: 900, color: C.blue, fontVariantNumeric: 'tabular-nums' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: t.primary, fontVariantNumeric: 'tabular-nums' }}>
                 {period?.short ?? item.uniperiod}
               </span>
-              <span style={{ fontSize: 'clamp(16px,2vw,24px)', fontWeight: 800, color: C.white }}>
-                {classIds.map(id => getCls(lookup, id)).join(', ')}
+              <span style={{ fontSize: 12, fontWeight: 600, color: t.onSurface, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {[item._classId, ...(item.classids ?? [])].filter(Boolean)
+                  .filter((v, i, a) => a.indexOf(v) === i)
+                  .map(id => getCls(lookup, id)).join(', ')}
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: t.onSurface, textTransform: 'uppercase', letterSpacing: '.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {item.subjectid ? getSubj(lookup, item.subjectid) : '–'}
+              </span>
+              <span style={{ fontSize: 12, color: t.onSurfaceMid, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {(item.teacherids ?? []).map(id => getTeach(lookup, id)).join(', ') || '–'}
+              </span>
+              <span style={{ fontSize: 12, color: t.onSurfaceMid, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {(item.classroomids ?? []).map(id => getRoom(lookup, id)).join(', ') || '–'}
               </span>
               <span style={{
-                fontSize: 'clamp(16px,2vw,24px)', fontWeight: 800, color: C.white,
-                textTransform: 'uppercase', letterSpacing: '.03em',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                textDecoration: cancelled ? 'line-through' : 'none',
-              }}>
-                {item.subjectid ? getSubj(lookup, item.subjectid) : '—'}
-              </span>
-              <span style={{ fontSize: 'clamp(14px,1.8vw,21px)', fontWeight: 600, color: C.mid, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {(item.teacherids ?? []).map(id => getTeach(lookup, id)).join(', ') || '—'}
-              </span>
-              <span style={{ fontSize: 'clamp(14px,1.8vw,21px)', fontWeight: 600, color: C.mid }}>
-                {(item.classroomids ?? []).map(id => getRoom(lookup, id)).join(', ') || '—'}
-              </span>
-              <span style={{
-                fontSize: 'clamp(13px,1.6vw,18px)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.05em',
-                color: accent, background: accentDim,
-                padding: '5px 12px', borderRadius: 8, textAlign: 'center',
+                fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em',
+                color: cancelled ? t.error : t.warn,
+                background: cancelled ? t.errorDim : t.warnDim,
+                padding: '3px 8px', borderRadius: 6, textAlign: 'center',
               }}>
                 {cancelled ? 'Odpadá' : item.type === 'substitution' ? 'Sup.' : 'Změna'}
               </span>
@@ -364,44 +340,48 @@ function EventsView({ events, lookup }) {
   const seen = new Set()
   const unique = (events?.classes ?? [])
     .flatMap(c => (c.ttitems ?? []).filter(i => i.type === 'event' && i.name))
-    .filter(e => { const k = e.name + '|' + (e.starttime ?? ''); if (seen.has(k)) return false; seen.add(k); return true })
+    .filter(e => {
+      const key = e.name + '|' + (e.starttime ?? '')
+      if (seen.has(key)) return false
+      seen.add(key); return true
+    })
 
   if (!unique.length) return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, opacity: .4 }}>
-      <span style={{ fontSize: 52 }}>📅</span>
-      <span style={{ fontSize: 'clamp(18px,2.5vw,28px)', color: C.mid, fontWeight: 600 }}>Dnes nejsou žádné události</span>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, opacity: .4 }}>
+      <svg width="36" height="36" viewBox="0 0 24 24" fill={t.onSurfaceMid}>
+        <path d="M19 3h-1V1h-2v2H8V1H6v2H5C3.9 3 3 3.9 3 5v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 18H5V8h14v13zM7 10h5v5H7z" />
+      </svg>
+      <span style={{ fontSize: 14, color: t.onSurfaceMid }}>Dnes nejsou žádné události</span>
     </div>
   )
 
   return (
     <div style={{
-      flex: 1, display: 'grid', gap: 14, alignContent: 'start', overflow: 'hidden',
-      gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))',
+      flex: 1, display: 'grid', gap: 10, alignContent: 'start', overflow: 'hidden',
+      gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))',
     }}>
       {unique.map((ev, i) => {
         const classNames = (ev.classids ?? []).map(id => getCls(lookup, id)).filter(Boolean)
-        const accent = accentColor(ev.colors?.[0])
         return (
           <div key={i} style={{
-            background: C.bgCardHi,
-            borderRadius: 16,
-            border: `1.5px solid ${C.border}`,
-            borderLeft: `5px solid ${accent || C.blue}`,
-            padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12,
+            background: cellBg(ev.colors?.[0]) ?? t.bgCardHi,
+            borderRadius: t.r.lg,
+            borderLeft: `3px solid ${cellAccent(ev.colors?.[0]) ?? t.primaryDim}`,
+            padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 8,
           }}>
             {ev.starttime && ev.endtime && (
               <span style={{
-                display: 'inline-block', background: C.surface,
-                color: C.blue, fontSize: 'clamp(14px,1.7vw,19px)', fontWeight: 700,
-                padding: '5px 14px', borderRadius: 24, width: 'fit-content', letterSpacing: '.03em',
+                display: 'inline-block', background: t.surface,
+                color: t.primary, fontSize: 11, fontWeight: 700,
+                padding: '3px 10px', borderRadius: 20, width: 'fit-content', letterSpacing: '.03em',
               }}>
                 {ev.starttime} – {ev.endtime}
               </span>
             )}
-            <div style={{ fontSize: 'clamp(18px,2.2vw,26px)', fontWeight: 700, color: C.white, lineHeight: 1.3 }}>
+            <div style={{ fontSize: 'clamp(13px,1.7vw,16px)', fontWeight: 600, color: t.onSurface, lineHeight: 1.35 }}>
               {ev.name}
             </div>
-            <div style={{ fontSize: 'clamp(14px,1.7vw,19px)', color: C.mid, fontWeight: 500 }}>
+            <div style={{ fontSize: 11, color: t.onSurfaceMid }}>
               {classNames.length ? `Třídy: ${classNames.join(', ')}` : 'Celá škola'}
             </div>
           </div>
@@ -419,21 +399,32 @@ export default function App() {
   const [now, setNow] = useState(new Date())
 
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000)
-    return () => clearInterval(t)
+    const tick = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(tick)
   }, [])
 
   const load = useCallback(() => { fetchAll().then(setData).catch(console.error) }, [])
-  useEffect(() => { load(); const t = setInterval(load, REFRESH_INTERVAL * 1000); return () => clearInterval(t) }, [load])
+  useEffect(() => {
+    load()
+    const t = setInterval(load, REFRESH_INTERVAL * 1000)
+    return () => clearInterval(t)
+  }, [load])
 
   const views = useMemo(() => {
     if (!data?.timetable) return []
     const classes = (data.timetable.classes ?? []).filter(c => c.id !== 'global')
     const pages = []
     for (let i = 0; i < classes.length; i += ROWS_PER_PAGE) {
-      pages.push({ type: 'timetable', rows: classes.slice(i, i + ROWS_PER_PAGE), page: Math.floor(i / ROWS_PER_PAGE) + 1, total: Math.ceil(classes.length / ROWS_PER_PAGE) })
+      pages.push({
+        type: 'timetable',
+        rows: classes.slice(i, i + ROWS_PER_PAGE),
+        page: Math.floor(i / ROWS_PER_PAGE) + 1,
+        total: Math.ceil(classes.length / ROWS_PER_PAGE),
+      })
     }
-    const hasSubs = (data.substitutions?.classes ?? []).some(c => (c.ttitems ?? []).some(i => i.changed || i.removed || ['absence', 'substitution'].includes(i.type)))
+    const hasSubs = (data.substitutions?.classes ?? []).some(c =>
+      (c.ttitems ?? []).some(i => i.changed || i.removed || ['absence', 'substitution'].includes(i.type))
+    )
     if (hasSubs) pages.push({ type: 'substitutions' })
     pages.push({ type: 'events' })
     return pages
@@ -457,60 +448,59 @@ export default function App() {
   const titles = { timetable: 'Školní rozvrh', substitutions: 'Suplování', events: 'Dnešní události' }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: C.bg, color: C.white, overflow: 'hidden', fontFamily: "'DM Sans','Segoe UI',system-ui,sans-serif" }}>
-      <style>{`
-        *{box-sizing:border-box;margin:0;padding:0}
-        html,body,#root{height:100%;overflow:hidden}
-        button{cursor:pointer;border:none;background:transparent}
-        @keyframes spin{to{transform:rotate(360deg)}}
-      `}</style>
+    <div style={S.app}>
+      <style>{`* { box-sizing:border-box; margin:0; padding:0 }
+        html,body,#root { height:100%; overflow:hidden }
+        button { cursor:pointer; border:none; background:transparent }
+        @keyframes spin { to { transform:rotate(360deg) } }`}
+      </style>
 
-      {/* progress bar */}
-      <div style={{ height: 4, background: C.surface, flexShrink: 0 }}>
-        <div style={{ height: '100%', background: C.blue, width: `${progress}%`, transition: 'width 100ms linear' }} />
+      <div style={S.progressTrack}>
+        <div style={S.progressFill(progress)} />
       </div>
 
-      {/* app bar */}
-      <header style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '14px 24px', background: C.bgCard, borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontSize: 'clamp(18px,2.5vw,28px)', fontWeight: 800, color: C.white, letterSpacing: '-.02em', lineHeight: 1 }}>
+      <header style={S.appBar}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <span style={{ fontSize: 'clamp(14px,1.9vw,20px)', fontWeight: 600, color: t.onSurface, letterSpacing: '-.01em', lineHeight: 1.2 }}>
             {titles[view?.type] ?? '…'}
           </span>
           {view?.type === 'timetable' && (
-            <span style={{ fontSize: 'clamp(11px,1.3vw,15px)', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: C.blue }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: t.primary, marginTop: 2 }}>
               Strana {view.page} / {view.total}
             </span>
           )}
         </div>
 
-        {/* indicator dots */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          {views.map((_, i) => (
-            <button key={i} onClick={() => { setViewIdx(i); setProgress(0) }} style={{
-              width: i === viewIdx ? 24 : 8, height: 8, borderRadius: 4,
-              background: i === viewIdx ? C.blue : C.dim,
-              transition: 'width .25s,background .25s', flexShrink: 0,
-            }} aria-label={`Strana ${i + 1}`} />
+        <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+          {views.map((v, i) => (
+            <button
+              key={i}
+              onClick={() => { setViewIdx(i); setProgress(0) }}
+              style={{
+                width: i === viewIdx ? 20 : 7, height: 7, borderRadius: 4,
+                background: i === viewIdx ? t.primary : t.outlineVar,
+                transition: 'width .25s, background .25s', flexShrink: 0,
+              }}
+              aria-label={`Přejít na ${i + 1}`}
+            />
           ))}
         </div>
 
-        {/* clock */}
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontSize: 'clamp(28px,4vw,48px)', fontWeight: 200, fontVariantNumeric: 'tabular-nums', lineHeight: 1, color: C.white, letterSpacing: '-.02em' }}>
+          <div style={{ fontSize: 'clamp(20px,2.8vw,34px)', fontWeight: 300, fontVariantNumeric: 'tabular-nums', lineHeight: 1, color: t.onSurface, letterSpacing: '-.02em' }}>
             {now.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </div>
-          <div style={{ fontSize: 'clamp(12px,1.4vw,16px)', color: C.mid, marginTop: 4, textTransform: 'capitalize', fontWeight: 500 }}>
+          <div style={{ fontSize: 10, color: t.onSurfaceMid, marginTop: 3, textTransform: 'capitalize' }}>
             {now.toLocaleDateString('cs-CZ', { weekday: 'long', day: 'numeric', month: 'long' })}
           </div>
         </div>
       </header>
 
-      {/* main */}
-      <main style={{ flex: 1, overflow: 'hidden', padding: 16, display: 'flex', flexDirection: 'column' }}>
+      <main style={{ flex: 1, overflow: 'hidden', padding: 10, display: 'flex', flexDirection: 'column' }}>
         {!data && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, color: C.mid }}>
-            <div style={{ width: 48, height: 48, border: `4px solid ${C.surface}`, borderTopColor: C.blue, borderRadius: '50%', animation: 'spin .8s linear infinite' }} />
-            <span style={{ fontSize: 'clamp(16px,2vw,22px)', fontWeight: 600 }}>Načítání dat…</span>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, color: t.onSurfaceMid, fontSize: 13 }}>
+            <div style={{ width: 38, height: 38, border: `3px solid ${t.outline}`, borderTopColor: t.primary, borderRadius: '50%', animation: 'spin .8s linear infinite' }} />
+            Načítání dat…
           </div>
         )}
         {data && view?.type === 'timetable' && <TimetableView rows={view.rows} lookup={data.lookup} subs={data.substitutions} />}
