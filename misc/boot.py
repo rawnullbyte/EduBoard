@@ -3,8 +3,10 @@ import subprocess
 import os
 import time
 import curses
+import requests
 from aengine import AnimationEngine
 from logo import text as logo_ascii
+
 
 def main(stdscr):
     engine = AnimationEngine(stdscr)
@@ -17,23 +19,40 @@ def main(stdscr):
         for line in result.stdout.splitlines():
             if line.strip():
                 engine.log(line)
-    except:
+    except Exception:
         pass
 
     engine.sleep(3)
     engine.clear_logs()
-
     engine.set_ascii(logo_ascii)
     engine.animate_ascii_move(duration=3, direction="up")
     engine.sleep(1)
     engine.animate_ascii_move(duration=3, direction="out")
 
-    engine.log("→ Switching to tty2...")
+    engine.log("→ Waiting for http://localhost:8000 to be ready...")
+    start_time = time.time()
+    timeout = 60
+    ready = False
 
+    while time.time() - start_time < timeout:
+        try:
+            resp = requests.get("http://localhost:8000", timeout=2)
+            if resp.status_code < 400:
+                engine.log(f"✓ localhost:8000 is ready (status {resp.status_code})")
+                ready = True
+                break
+        except (requests.exceptions.RequestException, ConnectionError):
+            pass
+
+        time.sleep(0.5)
+
+    if not ready:
+        engine.log("✗ Timeout waiting for localhost:8000 (continuing anyway)")
+
+    engine.log("→ Switching to tty2...")
     subprocess.run(["sudo", "chvt", "2"])
     time.sleep(1.5)
 
-    # Environment for Sway
     env = os.environ.copy()
     env.update({
         "WLR_BACKENDS": "drm",
@@ -47,9 +66,7 @@ def main(stdscr):
     })
 
     wallpaper_path = f"{os.getenv('HOME')}/EduBoard/misc/wallpaper.png"
-
     engine.log("→ Setting wallpaper...")
-
     if os.path.exists(wallpaper_path):
         subprocess.run(["swaybg", "-i", wallpaper_path, "-m", "fill"], env=env)
     else:
@@ -64,6 +81,7 @@ def main(stdscr):
     except Exception as e:
         engine.log(f"✗ Failed to start Sway: {e}")
         time.sleep(10)
+
 
 if __name__ == "__main__":
     curses.wrapper(main)

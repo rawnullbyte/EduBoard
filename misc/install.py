@@ -227,7 +227,6 @@ bar {{
     swaybar_command :
 }}
 
-exec swaybg -c "#000000" &
 exec firefox-esr --kiosk http://localhost:8000
 for_window [app_id="firefox"] fullscreen global
 bindsym Mod4+Shift+q kill
