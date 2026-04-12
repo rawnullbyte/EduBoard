@@ -226,6 +226,7 @@ WAYLAND_DISPLAY=wayland-0
     engine.log(" Creating Python virtual environment...")
     run_command(f"python3 -m venv {venv_dir}", user=username, log_callback=engine.log)
     run_command(f"sudo chown -R {username}:{username} {venv_dir}")
+    run_command(f"{venv_dir}/bin/pip install -r {repo_dir}/requirements.txt", user=username, log_callback=engine.log)
 
     # --- Systemd Service ---
     engine.log("")
