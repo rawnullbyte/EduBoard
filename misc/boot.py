@@ -51,7 +51,6 @@ def main(stdscr):
 
     engine.log("→ Switching to tty2...")
     subprocess.run(["sudo", "chvt", "2"])
-    time.sleep(1.5)
 
     env = os.environ.copy()
     env.update({
@@ -64,12 +63,6 @@ def main(stdscr):
         "XDG_SESSION_TYPE": "wayland",
         "XDG_CURRENT_DESKTOP": "sway",
     })
-
-    wallpaper_path = f"{os.getenv('HOME')}/EduBoard/misc/wallpaper.png"
-    engine.log("→ Setting wallpaper...")
-    subprocess.run(["swaymsg", "output", '"*"', "bg", wallpaper_path, "fill"], env=env)
-
-    time.sleep(0.8)
 
     # Start Sway
     engine.log("→ Launching Sway...")
