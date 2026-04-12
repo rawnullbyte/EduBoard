@@ -118,16 +118,17 @@ def main(stdscr):
     engine.log("")
 
     # --- Configuration ---
-    hostname = engine.ask("System Hostname", "tv1") or "tv1"
-    username = engine.ask("Kiosk Username", "kiosk") or "kiosk"
-    subdomain = engine.ask("School Subdomain", "school") or "school"
-    screen_id = engine.ask("Screen Identifier", "1") or "1"
-    password = engine.ask("Kiosk Password", "123456") or "123456"
+    hostname = engine.ask("System Hostname", "tv1", max_length=16) or "tv1"
+    username = engine.ask("Kiosk Username", "kiosk", max_length=32) or "kiosk"
+    subdomain = engine.ask("School Subdomain", "school", max_length=32) or "school"
+    screen_id = engine.ask("Screen Identifier", "1", max_length=6) or "1"
+    password = engine.ask("Kiosk Password", "123456", max_length=32) or "123456"
     
     # Tailscale option
     tailscale_token = engine.ask(
         "Tailscale Auth Token (optional)", 
-        ""
+        "",
+        max_length=64
     ) or ""
 
     engine.log("Configuration Summary:")
