@@ -128,72 +128,23 @@ class EduBoard:
     def fetchInfoscreenEventsData(self):
         r = httpx.post(
             f"https://{self.SCHOOL_SUBDOMAIN}.edupage.org/infoscreen/server/infoscreens.js?__func=getInfoscreenEventsData",
-            json={"__args":[None,"5",{"date":"2026-04-10"}],"__gsh":"00000000"},  # {"date":datetime.now().strftime('%Y-%m-%d')}
+            json={"__args": [None, "5", {"date": "2026-04-10"}], "__gsh": "00000000"},
             cookies=self.cookies,
             headers=self.headers
         )
         
-        response_data = r.json()
+        res_inner = r.json().get("r", {})
 
-        if response_data.get("r").get("ttitems") == []: return {}
-        
-        if "r" in response_data and "rows" in response_data["r"]:
-            parsed_data = {
-                "table": response_data["r"].get("table"),
-                "day_name": response_data["r"].get("day_name"),
-                "change_events": response_data["r"].get("_changeEvents", {}),
-                "classes": []
-            }
-            
-            for row in response_data["r"]["rows"]:
-                class_data = {
-                    "id": row.get("id"),
-                    "ttitems": []
+        parsed_data = {
+            "classes": [
+                {
+                    "id": "global",
+                    "ttitems": [dict(item) for item in res_inner.get("ttitems", [])]
                 }
-                
-                for item in row.get("ttitems", []):
-                    tt_item = {
-                        "type": item.get("type"),
-                        "date": item.get("date"),
-                        "uniperiod": item.get("uniperiod"),
-                        "starttime": item.get("starttime"),
-                        "endtime": item.get("endtime"),
-                    }
-                    
-                    if "name" in item:
-                        tt_item["name"] = item["name"]
-                    if "subjectid" in item:
-                        tt_item["subjectid"] = item["subjectid"]
-                    if "classids" in item:
-                        tt_item["classids"] = item["classids"]
-                    if "groupnames" in item:
-                        tt_item["groupnames"] = item["groupnames"]
-                    if "igroupid" in item:
-                        tt_item["igroupid"] = item["igroupid"]
-                    if "teacherids" in item:
-                        tt_item["teacherids"] = item["teacherids"]
-                    if "classroomids" in item:
-                        tt_item["classroomids"] = item["classroomids"]
-                    if "colors" in item:
-                        tt_item["colors"] = item["colors"]
-                    if "eventid" in item:
-                        tt_item["eventid"] = item["eventid"]
-                    if "absentid" in item:
-                        tt_item["absentid"] = item["absentid"]
-                    if "changed" in item:
-                        tt_item["changed"] = item["changed"]
-                    if "removed" in item:
-                        tt_item["removed"] = item["removed"]
-                    if "durationperiods" in item:
-                        tt_item["durationperiods"] = item["durationperiods"]
-                    
-                    class_data["ttitems"].append(tt_item)
-                
-                parsed_data["classes"].append(class_data)
-            
-            return parsed_data
+            ]
+        }
         
-        return response_data
+        return parsed_data
     
     def fetchTimetableData(self):
         r = httpx.post(
@@ -209,9 +160,6 @@ class EduBoard:
             return response_data
         
         data = {
-            "day_name": response_data["r"].get("day_name"),
-            "change_events": response_data["r"].get("_changeEvents", {}),
-            "table": response_data["r"].get("table"),
             "classes": []
         }
         
