@@ -3,7 +3,7 @@ import subprocess
 import os
 import time
 import curses
-import requests
+import httpx
 from aengine import AnimationEngine
 from logo import text as logo_ascii
 
@@ -36,12 +36,12 @@ def main(stdscr):
 
     while time.time() - start_time < timeout:
         try:
-            resp = requests.get("http://localhost:8000", timeout=2)
+            resp = httpx.get("http://localhost:8000", timeout=2)
             if resp.status_code < 400:
                 engine.log(f"✓ localhost:8000 is ready (status {resp.status_code})")
                 ready = True
                 break
-        except (requests.exceptions.RequestException, ConnectionError):
+        except (httpx.exceptions.RequestException, ConnectionError):
             pass
 
         time.sleep(0.5)
