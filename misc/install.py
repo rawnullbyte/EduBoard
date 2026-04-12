@@ -227,7 +227,7 @@ bar {{
     swaybar_command :
 }}
 
-exec swaybg -i {repo_dir}/misc/wallpaper.png -m fill &
+output * bg {repo_dir}/misc/wallpaper.png fill
 exec firefox-esr --kiosk http://localhost:8000
 for_window [app_id="firefox"] fullscreen global
 bindsym Mod4+Shift+q kill
