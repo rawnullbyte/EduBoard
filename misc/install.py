@@ -74,7 +74,7 @@ def main(stdscr):
     engine.sleep(1)
     engine.animate_ascii_move(duration=3, direction="out")
     engine.log("╔══════════════════════════════════════╗")
-    engine.log("║ EduBoard Setup Wizard ║")
+    engine.log("║ EduBoard Setup Wizard                ║")
     engine.log("╚══════════════════════════════════════╝")
     engine.log("")
 
@@ -118,10 +118,9 @@ def main(stdscr):
     run_command("sudo apt update", log_callback=engine.log)
 
     packages = [
-        "curl", "git", "python3-full", "python3-venv", "python3-dev",
-        "nodejs", "fonts-symbola", "fonts-noto-core", "fonts-dejavu", "fonts-wqy-microhei",
-        "kmscon", "firefox-esr", "wlr-randr", "seatd",
-        "libwlroots-dev", "libxkbcommon-dev"
+        "curl", "git", "python3-full", "python3-venv", "nodejs",
+        "fonts-symbola", "fonts-noto-core", "fonts-dejavu", "fonts-wqy-microhei",
+        "kmscon", "sway", "firefox-esr", "wlr-randr", "seatd", "swaybg"
     ]
     package_list = " ".join(packages)
     engine.log(f" Installing dependencies... (This may take a while!)")
@@ -134,11 +133,6 @@ def main(stdscr):
         log_callback=engine.log
     )
     engine.log(f"✓ Added user to required groups")
-
-    # --- Install Gabbia ---
-    engine.log("→ Installing Gabbia...")
-    run_command("sudo python3 -m pip install --break-system-packages gabbia", log_callback=engine.log)
-    engine.log("✓ Gabbia installed globally")
 
     # --- Fastfetch ---
     engine.log("→ Installing fastfetch...")
@@ -223,9 +217,28 @@ hwaccel
     write_file("/etc/kmscon/kmscon.conf", kmscon_conf_content)
     engine.log("✓ KMSCON configuration written")
 
-    engine.log("→ Creating Kiosk service for TTY2 (using global Gabbia)...")
+    sway_config_content = f"""
+default_border none
+default_floating_border none
+hide_edge_borders both
+gaps inner 0
+
+bar {{
+    swaybar_command :
+}}
+
+exec swaybg -c "#000000" &
+exec firefox-esr --kiosk http://localhost:8000
+for_window [app_id="firefox"] fullscreen global
+bindsym Mod4+Shift+q kill
+bindsym Ctrl+Alt+Delete exec swaymsg exit   # emergency exit to tty
+"""
+    write_file(f"{home_dir}/.config/sway/config", sway_config_content, user=username)
+    engine.log("✓ Sway kiosk config written")
+
+    engine.log("→ Creating Kiosk service for TTY2...")
     kiosk_service_content = f"""[Unit]
-Description=EduBoard Kiosk (Gabbia) on TTY2
+Description=EduBoard Kiosk (Sway) on TTY2
 After=network.target EduBoard.service seatd.service kmsconvt@tty1.service
 Requires=EduBoard.service seatd.service
 Conflicts=getty@tty2.service
@@ -235,7 +248,7 @@ After=kmsconvt@tty1.service
 User={username}
 Group={username}
 PAMName=login
-WorkingDirectory={repo_dir}
+WorkingDirectory={home_dir}
 
 Environment=WLR_BACKENDS=drm
 Environment=XDG_RUNTIME_DIR=/run/user/%U
@@ -243,8 +256,9 @@ Environment=WAYLAND_DISPLAY=wayland-0
 Environment=LIBSEAT_BACKEND=seatd
 Environment=WLR_LIBINPUT_NO_DEVICES=1
 Environment=WLR_NO_HARDWARE_CURSORS=1
+Environment=XDG_SESSION_TYPE=wayland
+Environment=XDG_CURRENT_DESKTOP=sway
 
-# Strongest settings to bind to tty2 without chvt
 TTYPath=/dev/tty2
 TTYReset=yes
 TTYVHangup=yes
@@ -255,11 +269,8 @@ StandardInput=tty
 StandardOutput=journal
 StandardError=journal
 
-# Wait for EduBoard web server
 ExecStartPre=/bin/bash -c 'until [ "$(curl -s -o /dev/null -w "%%{{http_code}}" http://localhost:8000)" -eq 200 ]; do sleep 1; done; sleep 2'
-
-# Run global Gabbia
-ExecStart=/usr/local/bin/gabbia -- /usr/bin/firefox-esr --kiosk http://localhost:8000
+ExecStart=/usr/bin/sway
 
 Restart=always
 RestartSec=5
@@ -268,9 +279,8 @@ RestartSec=5
 WantedBy=multi-user.target
 """
     write_file("/etc/systemd/system/kiosk.service", kiosk_service_content)
-    engine.log("✓ Kiosk service (Gabbia) created!")
+    engine.log("✓ Kiosk service (Sway) created!")
 
-    # Systemd override for tty1 (recovery console)
     override_dir = "/etc/systemd/system/kmsconvt@tty1.service.d"
     override_content = f"""[Service]
 ExecStart=
@@ -279,7 +289,6 @@ ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/km
     write_file(f"{override_dir}/override.conf", override_content)
     engine.log(f"✓ KMSCON configured for user '{username}' on tty1")
 
-    # Disable conflicting services
     engine.log(" Disabling conflicting terminal services...")
     run_command("sudo systemctl mask getty@tty1.service")
     run_command("sudo systemctl mask getty@tty2.service")
@@ -301,7 +310,7 @@ ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/km
 
     engine.log("")
     engine.log("╔══════════════════════════════════════╗")
-    engine.log("║ Installation Complete! ║")
+    engine.log("║ Installation Complete!               ║")
     engine.log("╚══════════════════════════════════════╝")
     engine.log("")
     engine.log("System will reboot in 3 seconds...")
