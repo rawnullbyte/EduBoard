@@ -1,77 +1,108 @@
 #!/usr/bin/env python3
 import subprocess
 import os
+import sys
 import time
 import curses
+import threading
 import httpx
 from aengine import AnimationEngine
 from logo import text as logo_ascii
 
-
-def main(stdscr):
-    engine = AnimationEngine(stdscr)
+def main(stdscr, debug=False):
+    engine = None
 
     try:
-        result = subprocess.run(
-            ["fastfetch", "--logo", "none", "--structure-disabled", "colors"],
-            capture_output=True, text=True
-        )
-        for line in result.stdout.splitlines():
-            if line.strip():
-                engine.log(line)
-    except Exception:
-        pass
+        engine = AnimationEngine(stdscr)
 
-    engine.sleep(3)
-    engine.clear_logs()
-    engine.set_ascii(logo_ascii)
-    engine.animate_ascii_move(duration=3, direction="up")
-    engine.sleep(1)
-    engine.animate_ascii_move(duration=3, direction="out")
+        if debug:
+            try:
+                result = subprocess.run(
+                    ["fastfetch", "--logo", "none", "--structure-disabled", "colors"],
+                    capture_output=True, text=True
+                )
+                for line in result.stdout.splitlines():
+                    if line.strip():
+                        engine.log(line)
+            except Exception:
+                pass
 
-    engine.log("→ Waiting for http://localhost:8000 to be ready...")
-    start_time = time.time()
-    timeout = 60
-    ready = False
+            engine.sleep(3)
 
-    while time.time() - start_time < timeout:
-        try:
-            resp = httpx.get("http://localhost:8000", timeout=2)
-            if resp.status_code < 400:
-                engine.log(f"✓ localhost:8000 is ready (status {resp.status_code})")
-                ready = True
+        engine.clear_logs()
+        engine.set_ascii(logo_ascii)
+        engine.ensure_healthy()
+
+        ready_event = threading.Event()
+
+        def wait_for_localhost():
+            try:
+                engine.log("→ Waiting for http://localhost:8000 to be ready...")
+                start_time = time.time()
+                timeout = 60
+
+                while time.time() - start_time < timeout and not ready_event.is_set():
+                    try:
+                        resp = httpx.get("http://localhost:8000", timeout=2)
+                        if resp.status_code < 400:
+                            engine.log(f"✓ localhost:8000 is ready (status {resp.status_code})")
+                            ready_event.set()
+                            return
+                    except (httpx.RequestError, ConnectionError):
+                        pass
+
+                    time.sleep(0.5)
+
+                if not ready_event.is_set():
+                    engine.log("✗ Timeout waiting for localhost:8000 (continuing anyway)")
+                    ready_event.set()
+            except Exception as exc:
+                engine.log(f"✗ Startup check failed: {exc}")
+                ready_event.set()
+
+        threading.Thread(target=wait_for_localhost, daemon=True).start()
+
+        while not ready_event.is_set():
+            engine.animate_ascii_move(duration=3, direction="up")
+            if ready_event.is_set():
                 break
-        except (httpx.exceptions.RequestException, ConnectionError):
-            pass
+            engine.sleep(1)
+            if ready_event.is_set():
+                break
+            engine.animate_ascii_move(duration=3, direction="out")
 
-        time.sleep(0.5)
+        engine.ensure_healthy()
+        engine.log("→ Switching to tty2...")
+        subprocess.run(["sudo", "chvt", "2"])
 
-    if not ready:
-        engine.log("✗ Timeout waiting for localhost:8000 (continuing anyway)")
+        env = os.environ.copy()
+        env.pop("WAYLAND_DISPLAY", None)
+        env.update({
+            "WLR_BACKENDS": "drm",
+            "XDG_RUNTIME_DIR": f"/run/user/{os.getuid()}",
+            "LIBSEAT_BACKEND": "seatd",
+            "WLR_LIBINPUT_NO_DEVICES": "1",
+            "WLR_NO_HARDWARE_CURSORS": "1",
+            "XDG_SESSION_TYPE": "wayland",
+            "XDG_CURRENT_DESKTOP": "sway",
+        })
 
-    engine.log("→ Switching to tty2...")
-    subprocess.run(["sudo", "chvt", "2"])
-
-    env = os.environ.copy()
-    env.pop("WAYLAND_DISPLAY", None)
-    env.update({
-        "WLR_BACKENDS": "drm",
-        "XDG_RUNTIME_DIR": f"/run/user/{os.getuid()}",
-        "LIBSEAT_BACKEND": "seatd",
-        "WLR_LIBINPUT_NO_DEVICES": "1",
-        "WLR_NO_HARDWARE_CURSORS": "1",
-        "XDG_SESSION_TYPE": "wayland",
-        "XDG_CURRENT_DESKTOP": "sway",
-    })
-
-    # Start Sway
-    engine.log("→ Launching Sway...")
-    try:
-        subprocess.run("sway -d > ~/sway.log 2>&1", env=env, check=True, shell=True)
-    except Exception as e:
-        engine.log(f"✗ Failed to start Sway: {e}")
-        time.sleep(10)
+        # Start Sway
+        engine.log("→ Launching Sway...")
+        try:
+            subprocess.run("sway -d > ~/sway.log 2>&1", env=env, check=True, shell=True)
+        except Exception as e:
+            engine.log(f"✗ Failed to start Sway: {e}")
+            engine.sleep(10)
+    finally:
+        if engine is not None:
+            engine.stop()
 
 
 if __name__ == "__main__":
-    curses.wrapper(main)
+    debug = "--debug" in sys.argv[1:]
+    try:
+        curses.wrapper(lambda stdscr: main(stdscr, debug=debug))
+    except Exception as exc:
+        print(f"Boot failed: {exc}")
+        time.sleep(10)

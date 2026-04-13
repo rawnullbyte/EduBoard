@@ -19,6 +19,7 @@ class AnimationEngine:
         self.particles = []
         self.logs = []
         self.running = True
+        self.render_error = None
         self.input_active = False
         self.input_result = None
         self.art_lines = []
@@ -62,13 +63,19 @@ class AnimationEngine:
             content = [i for i, c in enumerate(line) if c not in blanks]
             self.line_bounds.append((min(content), max(content)) if content else None)
 
+    def ensure_healthy(self):
+        if self.render_error is not None:
+            raise RuntimeError("Animation renderer stopped unexpectedly") from self.render_error
+
     def animate_ascii_move(self, duration=3, direction="up"):
+        self.ensure_healthy()
         self.art_visible = True
         self.h, self.w = self.stdscr.getmaxyx()
         center_y = (self.h - len(self.art_lines)) // 2
         start_time = time.time()
 
         while True:
+            self.ensure_healthy()
             elapsed = time.time() - start_time
             if elapsed > duration:
                 break
@@ -83,9 +90,13 @@ class AnimationEngine:
             self.art_visible = False
 
     def sleep(self, duration):
-        time.sleep(duration)
+        end_time = time.time() + duration
+        while time.time() < end_time:
+            self.ensure_healthy()
+            time.sleep(min(0.05, end_time - time.time()))
 
     def ask(self, question, placeholder="", max_length=2048):
+        self.ensure_healthy()
         self.input_active = True
         self.input_result = None
 
@@ -113,6 +124,7 @@ class AnimationEngine:
         }
 
         while self.input_result is None:
+            self.ensure_healthy()
             time.sleep(0.01)
 
         result = self.input_result
@@ -309,91 +321,98 @@ class AnimationEngine:
 
     def _render_loop(self):
         while self.running:
-            self.h, self.w = self.stdscr.getmaxyx()
-            self.stdscr.erase()
-            now = time.time()
+            try:
+                self.h, self.w = self.stdscr.getmaxyx()
+                self.stdscr.erase()
+                now = time.time()
 
-            if self.input_active:
-                self._handle_input()
+                if self.input_active:
+                    self._handle_input()
 
-            if self.input_active and self.input_win_info:
-                min_width = max(len(self.input_win_info['question']) + 20, 75)
-                self.input_win_info['w'] = min(min_width, self.w - 10)
-                self.input_win_info['input_width'] = self.input_win_info['w'] - 10
+                if self.input_active and self.input_win_info:
+                    min_width = max(len(self.input_win_info['question']) + 20, 75)
+                    self.input_win_info['w'] = min(min_width, self.w - 10)
+                    self.input_win_info['input_width'] = self.input_win_info['w'] - 10
 
-            # Particles
-            if random.random() < self.CONFIG["PARTICLE_CHANCE"]:
-                self.particles.append({
-                    "x": random.randint(0, self.w - 1),
-                    "y": float(self.h - 1),
-                    "speed": random.uniform(0.3, 0.9),
-                    "char": random.randint(0, 5),
-                    "phase": random.uniform(0, 2 * math.pi)
-                })
+                # Particles
+                if random.random() < self.CONFIG["PARTICLE_CHANCE"]:
+                    self.particles.append({
+                        "x": random.randint(0, self.w - 1),
+                        "y": float(self.h - 1),
+                        "speed": random.uniform(0.3, 0.9),
+                        "char": random.randint(0, 5),
+                        "phase": random.uniform(0, 2 * math.pi)
+                    })
 
-            new_particles = []
-            wy, wx, wh, ww = self._get_win_coords()
+                new_particles = []
+                wy, wx, wh, ww = self._get_win_coords()
 
-            for p in self.particles:
-                p["y"] -= p["speed"]
-                y, x = int(p["y"]), p["x"]
-                if y <= 0:
-                    continue
+                for p in self.particles:
+                    p["y"] -= p["speed"]
+                    y, x = int(p["y"]), p["x"]
+                    if y <= 0:
+                        continue
 
-                is_hidden = False
+                    is_hidden = False
 
-                if not self.art_visible and not self.input_active:
-                    if wy <= y < wy + wh and wx <= x < wx + ww:
-                        is_hidden = True
+                    if not self.art_visible and not self.input_active:
+                        if wy <= y < wy + wh and wx <= x < wx + ww:
+                            is_hidden = True
 
-                if not is_hidden and self.art_visible:
-                    rel_y = y - int(self.art_y)
-                    if 0 <= rel_y < len(self.line_bounds):
-                        b = self.line_bounds[rel_y]
-                        if b:
-                            sx = (self.w - len(self.art_lines[rel_y])) // 2
-                            if sx + b[0] <= x <= sx + b[1]:
-                                is_hidden = True
+                    if not is_hidden and self.art_visible:
+                        rel_y = y - int(self.art_y)
+                        if 0 <= rel_y < len(self.line_bounds):
+                            b = self.line_bounds[rel_y]
+                            if b:
+                                sx = (self.w - len(self.art_lines[rel_y])) // 2
+                                if sx + b[0] <= x <= sx + b[1]:
+                                    is_hidden = True
 
-                if not is_hidden and self.input_active and self.input_win_info:
-                    iy = self.input_win_info['y']
-                    ix = self.input_win_info['x']
-                    iw = self.input_win_info['w']
-                    ih = self.input_win_info['h']
-                    if iy <= y < iy + ih and ix <= x < ix + iw:
-                        is_hidden = True
+                    if not is_hidden and self.input_active and self.input_win_info:
+                        iy = self.input_win_info['y']
+                        ix = self.input_win_info['x']
+                        iw = self.input_win_info['w']
+                        ih = self.input_win_info['h']
+                        if iy <= y < iy + ih and ix <= x < ix + iw:
+                            is_hidden = True
 
-                if not is_hidden and 0 <= y < self.h and 0 <= x < self.w:
-                    pulse = (math.sin(now * 3.0 + p["phase"]) + 1) / 2
-                    color = int(pulse * 5) + 1
-                    try:
-                        self.stdscr.addch(y, x, self.CONFIG["CHARS"][p["char"]], curses.color_pair(color))
-                    except:
-                        pass
-                    new_particles.append(p)
-
-            self.particles = new_particles
-
-            if self.art_visible:
-                for i, line in enumerate(self.art_lines):
-                    ty = int(self.art_y) + i
-                    if 0 <= ty < self.h:
-                        sx = max(0, (self.w - len(line)) // 2)
+                    if not is_hidden and 0 <= y < self.h and 0 <= x < self.w:
+                        pulse = (math.sin(now * 3.0 + p["phase"]) + 1) / 2
+                        color = int(pulse * 5) + 1
                         try:
-                            self.stdscr.addstr(ty, sx, line, curses.color_pair(6) | curses.A_BOLD)
+                            self.stdscr.addch(y, x, self.CONFIG["CHARS"][p["char"]], curses.color_pair(color))
                         except:
                             pass
+                        new_particles.append(p)
 
-            if not self.input_active:
-                self._draw_logs()
+                self.particles = new_particles
 
-            self._draw_input_window()
+                if self.art_visible:
+                    for i, line in enumerate(self.art_lines):
+                        ty = int(self.art_y) + i
+                        if 0 <= ty < self.h:
+                            sx = max(0, (self.w - len(line)) // 2)
+                            try:
+                                self.stdscr.addstr(ty, sx, line, curses.color_pair(6) | curses.A_BOLD)
+                            except:
+                                pass
 
-            self.stdscr.refresh()
-            time.sleep(1 / self.CONFIG["FPS"])
+                if not self.input_active:
+                    self._draw_logs()
+
+                self._draw_input_window()
+
+                self.stdscr.refresh()
+                time.sleep(1 / self.CONFIG["FPS"])
+            except Exception as exc:
+                self.render_error = exc
+                self.running = False
+                break
 
     def stop(self):
         self.running = False
+        if self.thread.is_alive() and threading.current_thread() is not self.thread:
+            self.thread.join(timeout=0.2)
 
 
 # ====================== EXAMPLE ======================

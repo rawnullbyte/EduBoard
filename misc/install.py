@@ -1,10 +1,25 @@
 import subprocess
 import os
+import time
+import traceback
 from pathlib import Path
 from aengine import AnimationEngine
 from logo import text as logo_ascii
 import curses
 import pwd
+
+INSTALL_ERROR_LOG = os.path.expanduser("~/eduboard-install.log")
+
+
+def write_install_error(context, exc):
+    try:
+        with open(INSTALL_ERROR_LOG, "a", encoding="utf-8") as handle:
+            handle.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {context}\n")
+            handle.write("".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
+            handle.write("\n")
+        return INSTALL_ERROR_LOG
+    except OSError:
+        return None
 
 
 def run_command(command, user=None, cwd=None, log_callback=None):
@@ -334,4 +349,12 @@ ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/km
 
 
 if __name__ == "__main__":
-    curses.wrapper(main)
+    try:
+        curses.wrapper(main)
+    except Exception as exc:
+        log_path = write_install_error("Fatal installer error", exc)
+        if log_path:
+            print(f"Installer failed. Details saved to {log_path}")
+        else:
+            print("Installer failed. Details could not be written to disk.")
+        time.sleep(10)
