@@ -2,7 +2,7 @@
 
 EduBoard is a fullscreen school board for TVs, kiosks, and hallway displays. It takes the data from an EduPage infoscreen and turns it into a cleaner view of today's timetable and school events. The board is capable of energy saving features like powering the screen off using `wlr-randr` and powering it on only during breaks.
 
-If you just want to run it, the setup is simple: put your EduPage infoscreen details in `.env`, start the project with `./run.sh`, and open `http://localhost:8000`. If you are starting from a fresh Ubuntu Server 24.04 install, there is also a one-command installer that sets up the kiosk machine automatically. Under the hood, the project uses a Python service to talk to EduPage and a React frontend to render the board in the browser.
+If you just want to run it, the setup is simple: put your EduPage infoscreen details and `WEBSITE_URL` in `.env`, start the project with `./run.sh`, and open that URL. If you are starting from a fresh Ubuntu Server 24.04 install, there is also a one-command installer that sets up the kiosk machine automatically. Under the hood, the project uses a Python service to talk to EduPage and a React frontend to render the board in the browser.
 
 ## Screenshots
 
@@ -24,6 +24,7 @@ Use the same keys as `.env.example`:
 SCHOOL_SUBDOMAIN=your-school
 SCREEN_ID=1
 PASSWORD=your-infoscreen-password
+WEBSITE_URL=
 ```
 
 ### 2. Start the app
@@ -42,7 +43,7 @@ The helper script updates the repo, installs backend dependencies, builds the fr
 
 ### 3. Open the board
 
-Visit `http://localhost:8000`.
+Visit the URL from `WEBSITE_URL`.
 
 ## Technical Overview
 
@@ -76,7 +77,7 @@ The installer will:
 - clone the repository into the kiosk user's home directory
 - write the `.env` file from the values entered in the setup wizard
 - create a Python virtual environment and install backend dependencies
-- configure Sway to launch Firefox ESR in kiosk mode against `http://localhost:8000`
+- configure Sway to launch Firefox ESR in kiosk mode against `WEBSITE_URL` from `.env`
 - create and enable a systemd service for EduBoard
 - optionally install and authenticate Tailscale
 - configure a basic UFW firewall

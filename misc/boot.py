@@ -5,9 +5,16 @@ import sys
 import time
 import curses
 import threading
+from pathlib import Path
 import httpx
+from dotenv import load_dotenv
 from aengine import AnimationEngine
 from logo import text as logo_ascii
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(PROJECT_ROOT / ".env")
+
+WEBSITE_URL = os.environ["WEBSITE_URL"]
 
 def main(stdscr, debug=False):
     engine = None
@@ -35,17 +42,17 @@ def main(stdscr, debug=False):
 
         ready_event = threading.Event()
 
-        def wait_for_localhost():
+        def wait_for_website():
             try:
-                engine.log("→ Waiting for http://localhost:8000 to be ready...")
+                engine.log(f"→ Waiting for {WEBSITE_URL} to be ready...")
                 start_time = time.time()
                 timeout = 60
 
                 while time.time() - start_time < timeout and not ready_event.is_set():
                     try:
-                        resp = httpx.get("http://localhost:8000", timeout=2)
+                        resp = httpx.get(WEBSITE_URL, timeout=2)
                         if resp.status_code < 400:
-                            engine.log(f"✓ localhost:8000 is ready (status {resp.status_code})")
+                            engine.log(f"✓ {WEBSITE_URL} is ready (status {resp.status_code})")
                             ready_event.set()
                             return
                     except (httpx.RequestError, ConnectionError):
@@ -54,13 +61,13 @@ def main(stdscr, debug=False):
                     time.sleep(0.5)
 
                 if not ready_event.is_set():
-                    engine.log("✗ Timeout waiting for localhost:8000 (continuing anyway)")
+                    engine.log(f"✗ Timeout waiting for {WEBSITE_URL} (continuing anyway)")
                     ready_event.set()
             except Exception as exc:
                 engine.log(f"✗ Startup check failed: {exc}")
                 ready_event.set()
 
-        threading.Thread(target=wait_for_localhost, daemon=True).start()
+        threading.Thread(target=wait_for_website, daemon=True).start()
 
         while not ready_event.is_set():
             engine.animate_ascii_move(duration=3, direction="up")

@@ -12,7 +12,7 @@ import uvicorn
 import httpx
 import os
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 class EduBoard:
     def __init__(self):

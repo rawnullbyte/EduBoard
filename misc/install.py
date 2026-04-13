@@ -138,6 +138,7 @@ def main(stdscr):
     subdomain = engine.ask("School Subdomain", "school", max_length=32) or "school"
     screen_id = engine.ask("Screen Identifier", "1", max_length=6) or "1"
     password = engine.ask("Kiosk Password", "123456", max_length=32) or "123456"
+    website_url = engine.ask("Website URL", "http://localhost:8000", max_length=128) or ""
     
     # Tailscale option
     tailscale_token = engine.ask(
@@ -151,6 +152,7 @@ def main(stdscr):
     engine.log(f" • User: {username}")
     engine.log(f" • Subdomain: {subdomain}")
     engine.log(f" • Screen ID: {screen_id}")
+    engine.log(f" • Website URL: {website_url}")
     if tailscale_token.strip():
         engine.log(f" • Tailscale: Will be installed and authenticated")
     else:
@@ -233,6 +235,7 @@ def main(stdscr):
     env_content = f"""SCHOOL_SUBDOMAIN={subdomain}
 SCREEN_ID={screen_id}
 PASSWORD={password}
+WEBSITE_URL={website_url}
 WAYLAND_DISPLAY=wayland-0
 """
     write_file(f"{repo_dir}/.env", env_content, user=username)
@@ -288,7 +291,7 @@ gaps inner 0
 bar {{
     swaybar_command :
 }}
-exec firefox-esr --kiosk http://localhost:8000
+exec sh -lc ': "${{WEBSITE_URL:?WEBSITE_URL must be set in .env}}"; exec firefox-esr --kiosk "$WEBSITE_URL"'
 for_window [app_id="firefox"] fullscreen global
 bindsym Mod4+Shift+q kill
 bindsym Ctrl+Alt+Delete exec swaymsg exit # emergency exit to tty
