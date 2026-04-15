@@ -1,23 +1,36 @@
-import Paper from '@mui/material/Paper'
-import Stack from '@mui/material/Stack'
-import Typography from '@mui/material/Typography'
-
 export default function EmptyPage({ title, copy }) {
   return (
-    <Paper
-      sx={(currentTheme) => ({
+    <section
+      style={{
         height: '100%',
         borderRadius: '12px',
-        bgcolor: currentTheme.board.emptyPageBg,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-      })}
+        textAlign: 'center',
+        background: 'var(--md-sys-color-surface-container)',
+      }}
     >
-      <Stack spacing={1.4} sx={{ textAlign: 'center' }}>
-        <Typography variant="h3">{title}</Typography>
-        <Typography sx={{ color: 'text.secondary', fontSize: '1.3rem' }}>{copy}</Typography>
-      </Stack>
-    </Paper>
+      <md-outlined-card
+        style={{
+          padding: '2.2rem 2.6rem',
+          borderRadius: '12px',
+          maxWidth: '70ch',
+          borderColor: 'color-mix(in srgb, var(--md-sys-color-outline) 40%, transparent)',
+          background: 'var(--md-sys-color-surface-container-high)',
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: 'clamp(2rem, 3vw, 3.2rem)', lineHeight: 1.05 }}>{title}</h2>
+        <p
+          style={{
+            margin: '0.9rem 0 0',
+            color: 'var(--md-sys-color-on-surface-variant)',
+            fontSize: 'clamp(1.05rem, 1.5vw, 1.6rem)',
+          }}
+        >
+          {copy}
+        </p>
+      </md-outlined-card>
+    </section>
   )
 }

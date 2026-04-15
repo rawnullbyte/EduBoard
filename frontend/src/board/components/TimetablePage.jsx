@@ -1,8 +1,4 @@
 import { Fragment } from 'react'
-
-import Paper from '@mui/material/Paper'
-import Typography from '@mui/material/Typography'
-
 import { CLASSES_PER_PAGE } from '../constants'
 import LessonCard from './LessonCard'
 
@@ -12,113 +8,88 @@ export default function TimetablePage({ rows, periods }) {
   while (paddedRows.length < CLASSES_PER_PAGE) paddedRows.push(null)
 
   return (
-    <Paper
-      sx={(currentTheme) => ({
+    <section
+      style={{
         width: '100%',
         height: '100%',
-        p: 0.5,
-        borderRadius: '12px',
-        bgcolor: currentTheme.board.timetablePageBg,
-        borderColor: currentTheme.board.timetablePageBorder,
-      })}
+        display: 'grid',
+        gridTemplateColumns: `minmax(140px, 11vw) repeat(${periods.length}, minmax(0, 1fr))`,
+        gridTemplateRows: `minmax(85px, 9.5vh) repeat(${CLASSES_PER_PAGE}, minmax(0, 1fr))`,
+        gap: '0.45rem',
+      }}
     >
-      <Paper
-        component="div"
-        sx={(currentTheme) => ({
+      <md-filled-tonal-card
+        style={{
+          borderRadius: 'var(--board-shape-medium)',
           display: 'grid',
-          gridTemplateColumns: `minmax(120px, 10vw) repeat(${periods.length}, minmax(0, 1fr))`,
-          gridTemplateRows: `minmax(78px, 9vh) repeat(${CLASSES_PER_PAGE}, minmax(0, 1fr))`,
-          gap: 0.5,
-          width: '100%',
-          height: '100%',
-          bgcolor: currentTheme.board.transparent,
-          border: 0,
-        })}
+          placeItems: 'center',
+          background: 'var(--md-sys-color-surface-container-high)',
+          '--md-filled-tonal-card-container-color': 'var(--md-sys-color-surface-container-high)',
+        }}
       >
-        <Paper
-          sx={(currentTheme) => ({
-            borderRadius: '8px',
-            bgcolor: currentTheme.board.timetableHeaderBg,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          })}
-        >
-          <Typography variant="overline" sx={{ fontSize: '0.9rem', color: 'text.secondary' }}>
-            Třída
-          </Typography>
-        </Paper>
+        <span style={{ color: 'var(--md-sys-color-on-surface-variant)', fontWeight: 600, fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Třída</span>
+      </md-filled-tonal-card>
 
-        {periods.map((period) => (
-          <Paper
-            key={period.period}
-            sx={(currentTheme) => ({
-              borderRadius: '8px',
-              bgcolor: currentTheme.board.timetableHeaderBg,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              px: 0.5,
-            })}
+      {periods.map((period) => (
+        <md-filled-tonal-card
+          key={period.period}
+          style={{
+            borderRadius: 'var(--board-shape-medium)',
+            display: 'grid',
+            placeItems: 'center',
+            padding: '0.3rem',
+            background: 'var(--md-sys-color-surface-container-high)',
+            '--md-filled-tonal-card-container-color': 'var(--md-sys-color-surface-container-high)',
+          }}
+        >
+          <div style={{ fontSize: 'clamp(1.65rem, 2vw, 2.2rem)', lineHeight: 1, fontWeight: 700, color: 'var(--md-sys-color-primary)' }}>{period.short}</div>
+          <div style={{ marginTop: '0.22rem', textAlign: 'center', color: 'var(--md-sys-color-on-surface-variant)', fontSize: 'clamp(0.74rem, 0.86vw, 0.96rem)', fontWeight: 500 }}>
+            {period.start}
+            <br />
+            {period.end}
+          </div>
+        </md-filled-tonal-card>
+      ))}
+
+      {paddedRows.map((row, rowIndex) => (
+        <Fragment key={row?.id ?? `empty-row-${rowIndex}`}>
+          <md-outlined-card
+            style={{
+              borderRadius: '12px',
+              display: 'grid',
+              placeItems: 'center',
+              borderColor: row
+                ? 'color-mix(in srgb, var(--md-sys-color-outline) 20%, transparent)'
+                : 'color-mix(in srgb, var(--md-sys-color-outline) 26%, transparent)',
+              borderStyle: 'solid',
+              borderWidth: row ? '1px' : '1px',
+              background: row
+                ? 'var(--md-sys-color-surface-container-high)'
+                : 'color-mix(in srgb, var(--md-sys-color-surface-container-high) 76%, transparent)',
+              padding: '0.45rem',
+            }}
           >
-            <Typography variant="h5" sx={{ fontSize: '1.7rem', color: 'primary.main', lineHeight: 0.9 }}>
-              {period.short}
-            </Typography>
-            <Typography
-              sx={{
-                mt: 0.15,
-                fontSize: '0.82rem',
-                lineHeight: 1.02,
-                color: 'text.secondary',
+            <span
+              style={{
+                fontSize: 'clamp(1.7rem, 2.35vw, 3.25rem)',
+                fontWeight: 700,
+                letterSpacing: '-0.03em',
+                color: row ? 'var(--md-sys-color-on-surface)' : 'var(--md-sys-color-on-surface-variant)',
                 textAlign: 'center',
-                fontWeight: 800,
               }}
             >
-              {period.start}
-              <br />
-              {period.end}
-            </Typography>
-          </Paper>
-        ))}
+              {row?.name ?? '—'}
+            </span>
+          </md-outlined-card>
 
-        {paddedRows.map((row, rowIndex) => (
-          <Fragment key={row?.id ?? `empty-row-${rowIndex}`}>
-            <Paper
-              sx={(currentTheme) => ({
-                borderRadius: '8px',
-                bgcolor: row ? currentTheme.board.timetableRowBg : currentTheme.board.timetableEmptyRowBg,
-                borderColor: row ? currentTheme.board.timetableRowBorder : currentTheme.board.timetableEmptyRowBorder,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                px: 1,
-              })}
-            >
-              <Typography
-                variant="h4"
-                sx={(currentTheme) => ({
-                  fontSize: '2.6rem',
-                  fontWeight: 900,
-                  color: row ? currentTheme.palette.primary.main : currentTheme.palette.text.disabled,
-                  lineHeight: 0.88,
-                  letterSpacing: '-0.03em',
-                  textAlign: 'center',
-                })}
-              >
-                {row?.name ?? '—'}
-              </Typography>
-            </Paper>
-
-            {periods.map((period) => (
-              <LessonCard
-                key={`${row?.id ?? `empty-${rowIndex}`}-${period.period}`}
-                cell={row?.cells?.[String(period.period)] ?? null}
-              />
-            ))}
-          </Fragment>
-        ))}
-      </Paper>
-    </Paper>
+          {periods.map((period) => (
+            <LessonCard
+              key={`${row?.id ?? `empty-${rowIndex}`}-${period.period}`}
+              cell={row?.cells?.[String(period.period)] ?? null}
+            />
+          ))}
+        </Fragment>
+      ))}
+    </section>
   )
 }

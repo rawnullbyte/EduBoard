@@ -1,8 +1,3 @@
-import Box from '@mui/material/Box'
-import Paper from '@mui/material/Paper'
-import Stack from '@mui/material/Stack'
-import Typography from '@mui/material/Typography'
-
 function normalizeInlineText(value) {
   return String(value ?? '')
     .replace(/\s*\n\s*/g, ', ')
@@ -46,27 +41,21 @@ function getEventPageConfig(count) {
 
 function EventInfoBlock({ block, config }) {
   return (
-    <Stack
-      spacing={config.lineGap}
-      sx={{
-        minWidth: 0,
-        minHeight: 0,
-        height: 'auto',
-        overflow: 'hidden',
-      }}
-    >
-      <Typography
-        variant="overline"
-        sx={(currentTheme) => ({
+    <div style={{ minWidth: 0, overflow: 'hidden' }}>
+      <div
+        style={{
           fontSize: config.labelFont,
-          lineHeight: 1,
-          color: currentTheme.board.eventLabel,
-        })}
+          color: 'var(--md-sys-color-on-surface-variant)',
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          fontWeight: 700,
+        }}
       >
         {block.label}
-      </Typography>
-      <Typography
-        sx={{
+      </div>
+      <div
+        style={{
+          marginTop: `${config.lineGap}rem`,
           fontSize: block.label === 'Třídy' ? config.bodyFont : config.detailFont,
           fontWeight: block.label === 'Třídy' ? 800 : 600,
           lineHeight: 1.16,
@@ -87,8 +76,8 @@ function EventInfoBlock({ block, config }) {
         }}
       >
         {normalizeInlineText(block.value)}
-      </Typography>
-    </Stack>
+      </div>
+    </div>
   )
 }
 
@@ -100,21 +89,21 @@ function EventCard({ event, config }) {
   ].filter((block) => block.value)
 
   return (
-    <Paper
-      sx={(currentTheme) => ({
-        borderRadius: '10px',
-        bgcolor: currentTheme.board.eventCardBg,
-        borderColor: currentTheme.board.eventCardBorder,
-        px: config.cardPx,
-        py: config.cardPy,
+    <md-elevated-card
+      style={{
+        borderRadius: '12px',
+        padding: `${config.cardPy}rem ${config.cardPx}rem`,
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
         overflow: 'hidden',
-      })}
+        background: 'var(--md-sys-color-surface-container-high)',
+        border: '1px solid color-mix(in srgb, var(--md-sys-color-outline) 34%, transparent)',
+        boxShadow: 'none',
+      }}
     >
-      <Box
-        sx={{
+      <div
+        style={{
           display: 'grid',
           gridTemplateColumns: 'minmax(0, 1fr)',
           gridTemplateRows: 'auto minmax(0, 1fr)',
@@ -122,25 +111,21 @@ function EventCard({ event, config }) {
           height: '100%',
         }}
       >
-        <Stack spacing={config.showcase ? 1.35 : 1.15} sx={{ minHeight: 0, maxWidth: config.maxWidth, minWidth: 0 }}>
-          <Box
-            sx={(currentTheme) => ({
-              alignSelf: 'flex-start',
-              px: config.showcase ? 1.8 : 1.35,
-              py: config.showcase ? 0.78 : 0.62,
-              borderRadius: '999px',
-              bgcolor: currentTheme.board.eventChipBg,
-            })}
-          >
-            <Typography sx={{ fontSize: config.chipFont, fontWeight: 900 }}>{event.timeLabel}</Typography>
-          </Box>
-
-          <Typography
-            variant="h4"
-            sx={{
+        <div style={{ minHeight: 0, maxWidth: config.maxWidth, minWidth: 0 }}>
+          <md-assist-chip
+            label={event.timeLabel}
+            style={{
+              '--md-assist-chip-label-text-size': config.chipFont,
+              '--md-assist-chip-container-color': 'var(--md-sys-color-surface-container-highest)',
+              '--md-assist-chip-label-text-color': 'var(--md-sys-color-on-surface-variant)',
+            }}
+          />
+          <div
+            style={{
+              marginTop: config.showcase ? '0.9rem' : '0.6rem',
               fontSize: config.titleFont,
               lineHeight: 1.02,
-              fontWeight: 900,
+              fontWeight: 800,
               letterSpacing: '-0.035em',
               overflowWrap: 'anywhere',
               wordBreak: 'break-word',
@@ -151,42 +136,24 @@ function EventCard({ event, config }) {
             }}
           >
             {event.title}
-          </Typography>
-        </Stack>
+          </div>
+        </div>
 
         {config.showcase ? (
-          <Stack
-            spacing={config.sectionGap}
-            sx={{
-              minHeight: 0,
-              minWidth: 0,
-              pt: 1.6,
-              justifyContent: 'flex-start',
-              overflow: 'hidden',
-            }}
-          >
+          <div style={{ minHeight: 0, minWidth: 0, paddingTop: '1.2rem', overflow: 'hidden', display: 'grid', gap: `${config.sectionGap}rem` }}>
             {infoBlocks.map((block) => (
               <EventInfoBlock key={block.label} block={block} config={config} />
             ))}
-          </Stack>
+          </div>
         ) : (
-          <Stack
-            spacing={config.sectionGap}
-            sx={{
-              minHeight: 0,
-              minWidth: 0,
-              pt: 1.15,
-              justifyContent: 'flex-start',
-              overflow: 'hidden',
-            }}
-          >
+          <div style={{ minHeight: 0, minWidth: 0, paddingTop: '1rem', overflow: 'hidden', display: 'grid', gap: `${config.sectionGap}rem` }}>
             {infoBlocks.map((block) => (
               <EventInfoBlock key={block.label} block={block} config={config} />
             ))}
-          </Stack>
+          </div>
         )}
-      </Box>
-    </Paper>
+      </div>
+    </md-elevated-card>
   )
 }
 
@@ -195,51 +162,31 @@ export default function EventsPage({ events }) {
 
   if (!events.length) {
     return (
-      <Paper
-        sx={(currentTheme) => ({
-          height: '100%',
-          borderRadius: '12px',
-          bgcolor: currentTheme.board.emptyPageBg,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        })}
-      >
-        <Stack spacing={1.4} sx={{ textAlign: 'center' }}>
-          <Typography variant="h3">Bez akcí</Typography>
-          <Typography sx={{ color: 'text.secondary', fontSize: '1.3rem' }}>
+      <div style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
+        <md-filled-tonal-card style={{ padding: '2rem 2.4rem', borderRadius: '12px', textAlign: 'center', background: 'var(--md-sys-color-surface-container-high)' }}>
+          <h3 style={{ margin: 0, fontSize: 'clamp(2rem, 3.1vw, 3rem)' }}>Bez akcí</h3>
+          <p style={{ margin: '0.9rem 0 0', color: 'var(--md-sys-color-on-surface-variant)', fontSize: 'clamp(1.1rem, 1.4vw, 1.6rem)' }}>
             Na dnešní den nejsou zapsané žádné školní události.
-          </Typography>
-        </Stack>
-      </Paper>
+          </p>
+        </md-filled-tonal-card>
+      </div>
     )
   }
 
   return (
-    <Paper
-      sx={(currentTheme) => ({
+    <section
+      style={{
         width: '100%',
         height: '100%',
-        p: 0.8,
-        borderRadius: '12px',
-        bgcolor: currentTheme.board.eventPageBg,
-        borderColor: currentTheme.board.eventPageBorder,
-      })}
+        display: 'grid',
+        gridTemplateColumns: config.columns,
+        gridTemplateRows: config.rows,
+        gap: '0.85rem',
+      }}
     >
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: config.columns,
-          gridTemplateRows: config.rows,
-          gap: 1.05,
-          width: '100%',
-          height: '100%',
-        }}
-      >
         {events.map((event) => (
           <EventCard key={event.key} event={event} config={config} />
         ))}
-      </Box>
-    </Paper>
+    </section>
   )
 }

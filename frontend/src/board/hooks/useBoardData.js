@@ -1,6 +1,13 @@
 import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
 
-import { fetchBoardPayload, getPeriods, collectTimetableRows, collectEvents, buildPages } from '../boardData'
+import {
+  fetchBoardPayload,
+  getPeriods,
+  collectTimetableRows,
+  collectEvents,
+  collectSubstitutions,
+  buildPages,
+} from '../boardData'
 import { REFRESH_SECONDS } from '../constants'
 
 export function useBoardData() {
@@ -66,7 +73,14 @@ export function useBoardData() {
     () => collectEvents(payload?.events, payload?.timetable, payload?.lookup),
     [payload?.events, payload?.timetable, payload?.lookup],
   )
-  const pages = useMemo(() => buildPages(timetableRows, events), [timetableRows, events])
+  const substitutions = useMemo(
+    () => collectSubstitutions(payload?.timetable, payload?.lookup),
+    [payload?.timetable, payload?.lookup],
+  )
+  const pages = useMemo(
+    () => buildPages(timetableRows, events, substitutions),
+    [timetableRows, events, substitutions],
+  )
 
   return {
     loading,

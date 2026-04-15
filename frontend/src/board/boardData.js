@@ -1,4 +1,4 @@
-import { CLASSES_PER_PAGE, EVENTS_PER_PAGE } from './constants'
+import { CLASSES_PER_PAGE, EVENTS_PER_PAGE, SUBSTITUTIONS_PER_PAGE } from './constants'
 import { cleanEventName, formatTimeRange, joinInline, trimJoined } from './formatters'
 import { chunk, unique } from './utils'
 
@@ -249,7 +249,62 @@ export function collectEvents(eventsFeed, timetable, lookup) {
     .sort((left, right) => left.order - right.order || left.title.localeCompare(right.title, 'cs'))
 }
 
-export function buildPages(rows, events) {
+export function collectSubstitutions(timetable, lookup) {
+  const seen = new Set()
+
+  return (timetable?.classes ?? [])
+    .filter((row) => row.id !== 'global')
+    .flatMap((row) => {
+      const className = getClassName(lookup, row.id)
+
+      return sortItemsByPeriod(row.ttitems ?? [])
+        .filter((item) => item.type === 'card' && (item.changed || item.removed))
+        .map((item) => {
+          const periodInfo = lookup?.periods?.data?.[String(item.uniperiod)] ?? null
+          const subjectLabel = getSubjectName(lookup, item.subjectid) || 'Předmět'
+          const teacherLabel = joinInline(unique((item.teacherids ?? []).map((teacherId) => getTeacherName(lookup, teacherId))))
+          const roomLabel = joinInline(unique((item.classroomids ?? []).map((roomId) => getRoomName(lookup, roomId))))
+          const groupLabel = getGroupLabel(item)
+          const periodShort = periodInfo?.short || String(item.uniperiod ?? '?')
+          const periodTime = formatTimeRange(item.starttime ?? periodInfo?.start, item.endtime ?? periodInfo?.end)
+          const state = item.removed ? 'cancelled' : 'changed'
+          const signature = [
+            row.id,
+            item.uniperiod,
+            item.subjectid,
+            unique(item.teacherids ?? []).sort().join(','),
+            unique(item.classroomids ?? []).sort().join(','),
+            unique(item.groupnames ?? []).sort().join(','),
+            state,
+          ].join('|')
+
+          if (seen.has(signature)) return null
+          seen.add(signature)
+
+          return {
+            key: signature,
+            order: getPeriodOrder(item.uniperiod),
+            className,
+            subjectLabel,
+            teacherLabel,
+            roomLabel,
+            groupLabel,
+            periodShort,
+            periodTime,
+            state,
+          }
+        })
+        .filter(Boolean)
+    })
+    .sort(
+      (left, right) =>
+        left.order - right.order ||
+        left.className.localeCompare(right.className, 'cs') ||
+        left.subjectLabel.localeCompare(right.subjectLabel, 'cs'),
+    )
+}
+
+export function buildPages(rows, events, substitutions) {
   const pages = []
 
   chunk(rows, CLASSES_PER_PAGE).forEach((pageRows, index) => {
@@ -266,6 +321,22 @@ export function buildPages(rows, events) {
     })
   }
 
+  /* 
+  const substitutionPages = chunk(substitutions, SUBSTITUTIONS_PER_PAGE)
+
+  if (substitutionPages.length === 0) {
+    pages.push({ id: 'substitutions-empty', type: 'substitutions', substitutions: [] })
+  } else {
+    substitutionPages.forEach((pageSubstitutions, index) => {
+      pages.push({
+        id: `substitutions-${index}`,
+        type: 'substitutions',
+        substitutions: pageSubstitutions,
+      })
+    })
+  }
+  */
+
   if (pages.length === 0) pages.push({ id: 'empty', type: 'empty' })
 
   return pages
@@ -273,6 +344,7 @@ export function buildPages(rows, events) {
 
 export function getPageTitle(page) {
   if (page?.type === 'events') return 'Školní Akce'
+  if (page?.type === 'substitutions') return 'Suplování'
   if (page?.type === 'timetable') return 'Denní Rozvrh'
   return 'Školní Tabule'
 }

@@ -1,304 +1,157 @@
-import Box from '@mui/material/Box'
-import Paper from '@mui/material/Paper'
-import Stack from '@mui/material/Stack'
-import Typography from '@mui/material/Typography'
-
-function getEntrySizing(entry, dense = false) {
-  const total = entry.title.length + entry.kicker.length + (entry.metaLines ?? []).join('').length
-
-  if (entry.type === 'event') {
-    return {
-      kicker: dense ? '0.54rem' : '0.6rem',
-      title: total > 34 ? (dense ? '0.76rem' : '0.96rem') : dense ? '0.82rem' : '1.06rem',
-      meta: dense ? '0.74rem' : '0.9rem',
-      clamp: dense ? 2 : 4,
-    }
-  }
-
-  if (dense || total > 42) {
-    return {
-      kicker: '0.56rem',
-      title: total > 64 ? '1.06rem' : '1.22rem',
-      meta: '0.88rem',
-      clamp: 2,
-    }
-  }
-
-  if (total > 28) {
-    return {
-      kicker: '0.58rem',
-      title: '1.38rem',
-      meta: '0.96rem',
-      clamp: 2,
-    }
-  }
-
-  return {
-    kicker: '0.62rem',
-    title: '1.7rem',
-    meta: '1rem',
-    clamp: 2,
-  }
-}
-
-function getLessonPaperSx(currentTheme, tone) {
+function toneStyle(tone) {
   if (tone === 'event') {
     return {
-      bgcolor: currentTheme.board.lessonEventBg,
-      borderColor: currentTheme.board.lessonEventBorder,
+      borderColor: 'rgba(34, 197, 94, 0.85)',
+      background: 'rgba(22, 163, 74, 0.1)',
+      badgeBg: 'rgba(22, 163, 74, 0.22)',
+      badgeColor: '#baf7cf',
+      rail: '#2cd67b',
     }
   }
-
   if (tone === 'changed') {
     return {
-      bgcolor: currentTheme.board.lessonChangedBg,
-      borderColor: currentTheme.board.lessonChangedBorder,
+      borderColor: 'rgba(251, 191, 36, 0.88)',
+      background: 'rgba(245, 158, 11, 0.12)',
+      badgeBg: 'rgba(245, 158, 11, 0.24)',
+      badgeColor: '#ffe1a6',
+      rail: '#ffb020',
     }
   }
-
-  return {
-    bgcolor: currentTheme.board.lessonDefaultBg,
-    borderColor: currentTheme.board.lessonDefaultBorder,
-  }
+  return { borderColor: 'color-mix(in srgb, var(--md-sys-color-outline) 42%, transparent)', background: 'var(--md-sys-color-surface-container-high)' }
 }
 
-function getSplitEntrySizing(entry) {
-  const meta = (entry.metaLines ?? []).filter(Boolean).join(' / ')
-  const total = entry.title.length + entry.kicker.length + meta.length
-
-  if (total > 26) {
-    return {
-      kicker: '0.48rem',
-      title: '0.94rem',
-      meta: '0.56rem',
-    }
-  }
-
-  if (total > 18) {
-    return {
-      kicker: '0.5rem',
-      title: '1.04rem',
-      meta: '0.6rem',
-    }
-  }
-
-  return {
-    kicker: '0.52rem',
-    title: '1.14rem',
-    meta: '0.64rem',
-  }
-}
-
-function CardStatusRail({ tone }) {
-  if (!tone || tone === 'default' || tone === 'empty') return null
-
+function LessonEntry({ entry, compact = false }) {
   return (
-    <Box
-      sx={(currentTheme) => ({
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        height: 7,
-        bgcolor: tone === 'event' ? currentTheme.palette.success.main : currentTheme.palette.warning.main,
-      })}
-    />
-  )
-}
-
-function LessonEntry({ entry, dense = false }) {
-  const sizing = getEntrySizing(entry, dense)
-
-  return (
-    <Stack spacing={0.28} sx={{ minWidth: 0, minHeight: 0, justifyContent: 'flex-start', flex: 1, overflow: 'hidden' }}>
-      {entry.kicker && (
-        <Typography
-          variant="overline"
-          sx={(currentTheme) => ({
-            fontSize: sizing.kicker,
-            color: currentTheme.board.lessonKicker,
-            lineHeight: 1.15,
+    <div style={{ minWidth: 0 }}>
+      {entry.kicker ? (
+        <div
+          style={{
+            color: 'var(--md-sys-color-primary)',
+            fontWeight: 700,
+            fontSize: compact ? '0.62rem' : '0.74rem',
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
-          })}
+          }}
         >
           {entry.kicker}
-        </Typography>
-      )}
-
-      <Typography
-        variant="h5"
-        sx={{
-          fontSize: sizing.title,
-          lineHeight: 1.12,
-          pt: '0.12em',
-          pb: '0.03em',
+        </div>
+      ) : null}
+      <div
+        style={{
+          marginTop: compact ? '0.1rem' : '0.2rem',
           fontWeight: 800,
-          overflowWrap: 'anywhere',
-          wordBreak: 'break-word',
-          display: '-webkit-box',
-          overflow: 'hidden',
-          WebkitBoxOrient: 'vertical',
-          WebkitLineClamp: sizing.clamp,
-        }}
-      >
-        {entry.title}
-      </Typography>
-
-      {(entry.metaLines ?? []).length > 0 && (
-        <Stack spacing={0.1} sx={{ minHeight: 0 }}>
-          {entry.metaLines.slice(0, 2).map((line, index) => (
-            <Typography
-              key={`${line}-${index}`}
-              sx={(currentTheme) => ({
-                fontSize: sizing.meta,
-                lineHeight: 1.12,
-                color: currentTheme.palette.text.secondary,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              })}
-            >
-              {line}
-            </Typography>
-          ))}
-        </Stack>
-      )}
-    </Stack>
-  )
-}
-
-function SplitLessonEntry({ entry }) {
-  const sizing = getSplitEntrySizing(entry)
-  const compactMeta = (entry.metaLines ?? []).filter(Boolean).join(' / ')
-
-  return (
-    <Stack
-      spacing={0.04}
-      sx={{
-        flex: 1,
-        width: '100%',
-        minWidth: 0,
-        minHeight: 0,
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        overflow: 'hidden',
-      }}
-    >
-      {entry.kicker && (
-        <Typography
-          variant="overline"
-          sx={(currentTheme) => ({
-            fontSize: sizing.kicker,
-            lineHeight: 1.02,
-            color: currentTheme.board.lessonKicker,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            width: '100%',
-          })}
-        >
-          {entry.kicker}
-        </Typography>
-      )}
-
-      <Typography
-        variant="h6"
-        sx={{
-          fontSize: sizing.title,
-          lineHeight: 1.06,
-          pt: '0.05em',
-          pb: '0.02em',
-          fontWeight: 800,
+          fontSize: compact ? 'clamp(0.82rem, 0.9vw, 1.06rem)' : 'clamp(0.95rem, 1.05vw, 1.42rem)',
+          lineHeight: compact ? 1.08 : 1.15,
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
-          width: '100%',
         }}
       >
         {entry.title}
-      </Typography>
-
-      {compactMeta && (
-        <Typography
-          sx={(currentTheme) => ({
-            fontSize: sizing.meta,
-            lineHeight: 1.02,
-            color: currentTheme.palette.text.secondary,
+      </div>
+      {(entry.metaLines ?? []).slice(0, compact ? 1 : 2).map((line, index) => (
+        <div
+          key={`${line}-${index}`}
+          style={{
+            marginTop: compact ? '0.06rem' : '0.12rem',
+            color: 'var(--md-sys-color-on-surface-variant)',
+            fontSize: compact ? 'clamp(0.64rem, 0.68vw, 0.86rem)' : 'clamp(0.72rem, 0.76vw, 1rem)',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
-            width: '100%',
-          })}
+          }}
         >
-          {compactMeta}
-        </Typography>
-      )}
-    </Stack>
+          {line}
+        </div>
+      ))}
+    </div>
   )
 }
 
 export default function LessonCard({ cell }) {
   if (!cell || cell.layout === 'blank') {
     return (
-      <Paper
-        sx={(currentTheme) => ({
-          position: 'relative',
+      <div
+        style={{
           height: '100%',
-          borderRadius: '8px',
-          bgcolor: currentTheme.board.lessonEmptyBg,
-          borderColor: currentTheme.board.lessonEmptyBorder,
-        })}
+          borderRadius: 'var(--board-shape-medium)',
+          background: 'var(--md-sys-color-surface-container)',
+          border: '1px solid color-mix(in srgb, var(--md-sys-color-outline) 28%, transparent)',
+        }}
       />
     )
   }
 
-  const denseEntry = cell.entries.length > 1
+  const cardStyle = toneStyle(cell.tone)
+  const showSubstitutionTag = cell.tone === 'event' || cell.tone === 'changed'
+  const compactSplit = cell.layout === 'split'
 
   return (
-    <Paper
-      sx={(currentTheme) => ({
-        ...getLessonPaperSx(currentTheme, cell.tone),
+    <md-outlined-card
+      style={{
         position: 'relative',
         height: '100%',
-        borderRadius: '8px',
-        px: cell.layout === 'split' ? 0.9 : 1.35,
-        pt: cell.layout === 'split' ? 0.85 : 1.2,
-        pb: cell.layout === 'split' ? 0.78 : 1.05,
+        borderRadius: 'var(--board-shape-medium)',
+        borderColor: cardStyle.borderColor,
+        background: cardStyle.background,
         overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-      })}
+      }}
     >
-      {cell.layout === 'split' ? (
-        <Stack sx={{ flex: 1, minHeight: 0, justifyContent: 'stretch', gap: 0.14, overflow: 'hidden' }}>
+      {showSubstitutionTag ? (
+        <div
+          style={{
+            height: '6px',
+            width: '100%',
+            background: cardStyle.rail,
+          }}
+        />
+      ) : null}
+      <div style={{ padding: '0.58rem 0.8rem 0.68rem' }}>
+        {showSubstitutionTag ? (
+          <span
+            style={{
+              display: 'inline-block',
+              marginBottom: compactSplit ? '0.18rem' : '0.38rem',
+              padding: compactSplit ? '0.05rem 0.36rem' : '0.08rem 0.46rem',
+              borderRadius: '999px',
+              background: cardStyle.badgeBg,
+              color: cardStyle.badgeColor,
+              fontSize: compactSplit ? '0.56rem' : '0.66rem',
+              lineHeight: 1.35,
+              letterSpacing: '0.08em',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+            }}
+          >
+            {cell.tone === 'changed' ? 'Změna' : 'Akce'}
+          </span>
+        ) : null}
+        <div
+          style={{
+            height: '100%',
+            display: 'grid',
+            gridTemplateRows: `repeat(${cell.entries.length}, minmax(0, 1fr))`,
+            gap: compactSplit ? '0.14rem' : '0.34rem',
+          }}
+        >
           {cell.entries.map((entry, index) => (
-            <Box
-              key={`${entry.kicker}-${entry.title}-${index}`}
-              sx={(currentTheme) => ({
-                flex: 1,
-                display: 'flex',
-                alignItems: 'stretch',
+            <div
+              key={`${entry.title}-${index}`}
+              style={{
                 minHeight: 0,
-                pt: index === 0 ? 0 : 0.16,
-                borderTop: index === 0 ? 0 : `1px solid ${currentTheme.board.lessonSplitDivider}`,
                 overflow: 'hidden',
-              })}
+                borderTop: index > 0 ? '1px solid rgba(135, 147, 168, 0.25)' : 'none',
+                paddingTop: index > 0 ? (compactSplit ? '0.16rem' : '0.35rem') : 0,
+              }}
             >
-              <SplitLessonEntry entry={entry} />
-            </Box>
+              <LessonEntry entry={entry} compact={compactSplit} />
+            </div>
           ))}
-        </Stack>
-      ) : (
-        <Stack spacing={denseEntry ? 0.18 : 0.5} sx={{ flex: 1, minHeight: 0, justifyContent: 'flex-start' }}>
-          {cell.entries.map((entry, index) => (
-            <LessonEntry key={`${entry.title}-${index}`} entry={entry} dense={denseEntry} />
-          ))}
-        </Stack>
-      )}
-
-      <CardStatusRail tone={cell.tone} />
-    </Paper>
+        </div>
+      </div>
+    </md-outlined-card>
   )
 }
