@@ -32,8 +32,7 @@ def run_command(command, user=None, cwd=None, log_callback=None):
         "WAYLAND_DISPLAY": "wayland-0"
     })
     directory = cwd if cwd else "."
-    
-    if user:
+        if user:
         escaped_command = command.replace("'", "'\\''")
         full_command = f"sudo -u {user} -i cd {directory} && {escaped_command}"
     else:
@@ -200,10 +199,10 @@ def main(stdscr):
     engine.log(f"✓ Added user to required groups")
 
     # --- Fastfetch ---
-    engine.log("→ Installing fastfetch...")
-    run_command("wget https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-amd64.deb -O /tmp/fastfetch.deb", log_callback=engine.log)
-    run_command("sudo dpkg -i /tmp/fastfetch.deb", log_callback=engine.log)
-    engine.log("✓ Fastfetch installed")
+    #engine.log("→ Installing fastfetch...")
+    #run_command("wget https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-amd64.deb -O /tmp/fastfetch.deb", log_callback=engine.log)
+    #run_command("sudo dpkg -i /tmp/fastfetch.deb", log_callback=engine.log)
+    #engine.log("✓ Fastfetch installed")
 
     # Firefox policies
     firefox_policies = """{
