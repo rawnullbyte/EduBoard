@@ -152,6 +152,12 @@ def main(stdscr):
     subdomain = engine.ask("School Subdomain", "school", max_length=32) or "school"
     screen_id = engine.ask("Screen Identifier", "1", max_length=6) or "1"
     password = engine.ask("Kiosk Password", "123456", max_length=32) or "123456"
+    use_light_theme = (
+        engine.ask("Use Light Theme? (y/N)", "N", max_length=1).lower() == "y"
+    )
+    debug_mode = (
+        engine.ask("Enable Debug Mode? (y/N)", "N", max_length=1).lower() == "y"
+    )
     website_url = (
         engine.ask("Website URL", "http://localhost:8000", max_length=128) or ""
     )
@@ -274,7 +280,8 @@ def main(stdscr):
 SCREEN_ID={screen_id}
 PASSWORD={password}
 WEBSITE_URL={website_url}
-WAYLAND_DISPLAY=wayland-0
+VITE_USE_LIGHT_THEME={use_light_theme}
+DEBUG={debug_mode}
 """
     write_file(f"{repo_dir}/.env", env_content, user=username)
     engine.log("✓ Environment configuration written")

@@ -15,15 +15,16 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(PROJECT_ROOT / ".env")
 
 WEBSITE_URL = os.environ["WEBSITE_URL"]
+DEBUG = os.environ["DEBUG"]
 
 
-def main(stdscr, debug=False):
+def main(stdscr):
     engine = None
 
     try:
         engine = AnimationEngine(stdscr)
 
-        if debug:
+        if DEBUG:
             try:
                 # result = subprocess.run(
                 #     ["fastfetch", "--logo", "none", "--structure-disabled", "colors"],
@@ -119,9 +120,8 @@ def main(stdscr, debug=False):
 
 
 if __name__ == "__main__":
-    debug = "--debug" in sys.argv[1:]
     try:
-        curses.wrapper(lambda stdscr: main(stdscr, debug=debug))
+        curses.wrapper(lambda stdscr: main(stdscr))
     except Exception as exc:
         print(f"Boot failed: {exc}")
         time.sleep(10)
