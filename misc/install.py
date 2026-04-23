@@ -32,7 +32,7 @@ def run_command(command, user=None, cwd=None, log_callback=None):
         "WAYLAND_DISPLAY": "wayland-0"
     })
     directory = cwd if cwd else "."
-        if user:
+    if user:
         escaped_command = command.replace("'", "'\\''")
         full_command = f"sudo -u {user} -i cd {directory} && {escaped_command}"
     else:
@@ -184,7 +184,7 @@ def main(stdscr):
     packages = [
         "curl", "git", "python3-full", "python3-venv", "nodejs",
         "fonts-symbola", "fonts-noto-core", "fonts-dejavu", "fonts-wqy-microhei",
-        "kmscon", "sway", "firefox-esr", "wlr-randr", "seatd", "swaybg", "ufw"
+        "kmscon", "sway", "firefox-esr", "wlr-randr", "seatd", "swaybg", "ufw", "neofetch"
     ]
     package_list = " ".join(packages)
     engine.log(f" Installing dependencies... (This may take a while!)")
