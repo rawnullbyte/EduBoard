@@ -1,5 +1,4 @@
 :root {
-  color-scheme: dark;
   --board-shape-large: 16px;
   --board-shape-medium: 12px;
 }
@@ -21,7 +20,7 @@ body,
 
 body {
   font-family: var(--board-font-family);
-  background: #0f1012;
+  background: var(--md-sys-color-surface);
   color: var(--md-sys-color-on-surface);
 }
 
