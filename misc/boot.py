@@ -16,6 +16,7 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 WEBSITE_URL = os.environ["WEBSITE_URL"]
 
+
 def main(stdscr, debug=False):
     engine = None
 
@@ -29,8 +30,9 @@ def main(stdscr, debug=False):
                 #     capture_output=True, text=True
                 # )
                 result = subprocess.run(
-                    ["neofetch", "--off", "--color_blocks", "off"],
-                    capture_output=True, text=True
+                    ["neofetch", "--stdout"],
+                    capture_output=True,
+                    text=True,
                 )
                 for line in result.stdout.splitlines():
                     if line.strip():
@@ -56,7 +58,9 @@ def main(stdscr, debug=False):
                     try:
                         resp = httpx.get(WEBSITE_URL, timeout=2)
                         if resp.status_code < 400:
-                            engine.log(f"✓ {WEBSITE_URL} is ready (status {resp.status_code})")
+                            engine.log(
+                                f"✓ {WEBSITE_URL} is ready (status {resp.status_code})"
+                            )
                             ready_event.set()
                             return
                     except (httpx.RequestError, ConnectionError):
@@ -65,7 +69,9 @@ def main(stdscr, debug=False):
                     time.sleep(0.5)
 
                 if not ready_event.is_set():
-                    engine.log(f"✗ Timeout waiting for {WEBSITE_URL} (continuing anyway)")
+                    engine.log(
+                        f"✗ Timeout waiting for {WEBSITE_URL} (continuing anyway)"
+                    )
                     ready_event.set()
             except Exception as exc:
                 engine.log(f"✗ Startup check failed: {exc}")
@@ -88,15 +94,17 @@ def main(stdscr, debug=False):
 
         env = os.environ.copy()
         env.pop("WAYLAND_DISPLAY", None)
-        env.update({
-            "WLR_BACKENDS": "drm",
-            "XDG_RUNTIME_DIR": f"/run/user/{os.getuid()}",
-            "LIBSEAT_BACKEND": "seatd",
-            "WLR_LIBINPUT_NO_DEVICES": "1",
-            "WLR_NO_HARDWARE_CURSORS": "1",
-            "XDG_SESSION_TYPE": "wayland",
-            "XDG_CURRENT_DESKTOP": "sway",
-        })
+        env.update(
+            {
+                "WLR_BACKENDS": "drm",
+                "XDG_RUNTIME_DIR": f"/run/user/{os.getuid()}",
+                "LIBSEAT_BACKEND": "seatd",
+                "WLR_LIBINPUT_NO_DEVICES": "1",
+                "WLR_NO_HARDWARE_CURSORS": "1",
+                "XDG_SESSION_TYPE": "wayland",
+                "XDG_CURRENT_DESKTOP": "sway",
+            }
+        )
 
         # Start Sway
         engine.log("→ Launching Sway...")

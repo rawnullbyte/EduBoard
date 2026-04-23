@@ -15,7 +15,9 @@ def write_install_error(context, exc):
     try:
         with open(INSTALL_ERROR_LOG, "a", encoding="utf-8") as handle:
             handle.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {context}\n")
-            handle.write("".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
+            handle.write(
+                "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+            )
             handle.write("\n")
         return INSTALL_ERROR_LOG
     except OSError:
@@ -24,13 +26,15 @@ def write_install_error(context, exc):
 
 def run_command(command, user=None, cwd=None, log_callback=None):
     custom_env = os.environ.copy()
-    custom_env.update({
-        "DEBIAN_FRONTEND": "noninteractive",
-        "TERM": "xterm-256color",
-        "LANG": "en_US.UTF-8",
-        "LC_ALL": "en_US.UTF-8",
-        "WAYLAND_DISPLAY": "wayland-0"
-    })
+    custom_env.update(
+        {
+            "DEBIAN_FRONTEND": "noninteractive",
+            "TERM": "xterm-256color",
+            "LANG": "en_US.UTF-8",
+            "LC_ALL": "en_US.UTF-8",
+            "WAYLAND_DISPLAY": "wayland-0",
+        }
+    )
     directory = cwd if cwd else "."
     if user:
         escaped_command = command.replace("'", "'\\''")
@@ -39,19 +43,25 @@ def run_command(command, user=None, cwd=None, log_callback=None):
         full_command = command
 
     process = subprocess.run(
-        full_command, shell=True, executable="/bin/bash",
-        env=custom_env, capture_output=True, text=True
+        full_command,
+        shell=True,
+        executable="/bin/bash",
+        env=custom_env,
+        capture_output=True,
+        text=True,
     )
-    
+
     if process.returncode != 0:
         error_msg = process.stderr.strip() if process.stderr else "Unknown error"
         if log_callback:
             log_callback(f"✗ Command failed: {error_msg}")
         raise subprocess.CalledProcessError(
-            process.returncode, full_command,
-            output=process.stdout, stderr=process.stderr
+            process.returncode,
+            full_command,
+            output=process.stdout,
+            stderr=process.stderr,
         )
-    
+
     if log_callback and process.stdout:
         output = process.stdout.strip()
         if output and len(output) < 200:
@@ -91,25 +101,30 @@ def install_tailscale(auth_token, log_callback=None):
     """Install and authenticate Tailscale if an auth token is supplied"""
     if not auth_token or auth_token.strip() == "":
         if log_callback:
-            log_callback("→ No Tailscale auth token provided. Skipping Tailscale installation.")
+            log_callback(
+                "→ No Tailscale auth token provided. Skipping Tailscale installation."
+            )
         return False
 
     try:
         log_callback("→ Installing Tailscale...")
         # Install Tailscale using official script
-        run_command("curl -fsSL https://tailscale.com/install.sh | sh", log_callback=log_callback)
-        
+        run_command(
+            "curl -fsSL https://tailscale.com/install.sh | sh",
+            log_callback=log_callback,
+        )
+
         # Enable and start the daemon
         run_command("sudo systemctl enable --now tailscaled", log_callback=log_callback)
-        
+
         # Authenticate
         log_callback("→ Authenticating Tailscale with provided auth key...")
         run_command(
             f"sudo tailscale up --authkey={auth_token.strip()} "
             f"--accept-routes --accept-dns=false --advertise-exit-node=false",
-            log_callback=log_callback
+            log_callback=log_callback,
         )
-        
+
         log_callback("✓ Tailscale installed and authenticated successfully!")
         return True
     except Exception as e:
@@ -137,14 +152,14 @@ def main(stdscr):
     subdomain = engine.ask("School Subdomain", "school", max_length=32) or "school"
     screen_id = engine.ask("Screen Identifier", "1", max_length=6) or "1"
     password = engine.ask("Kiosk Password", "123456", max_length=32) or "123456"
-    website_url = engine.ask("Website URL", "http://localhost:8000", max_length=128) or ""
-    
+    website_url = (
+        engine.ask("Website URL", "http://localhost:8000", max_length=128) or ""
+    )
+
     # Tailscale option
-    tailscale_token = engine.ask(
-        "Tailscale Auth Token (optional)", 
-        "",
-        max_length=64
-    ) or ""
+    tailscale_token = (
+        engine.ask("Tailscale Auth Token (optional)", "", max_length=64) or ""
+    )
 
     engine.log("Configuration Summary:")
     engine.log(f" • Hostname: {hostname}")
@@ -170,21 +185,45 @@ def main(stdscr):
         pwd.getpwnam(username)
         engine.log(f" User '{username}' already exists")
     except KeyError:
-        run_command(f"sudo adduser --disabled-password --gecos '' {username}", log_callback=engine.log)
-        run_command(f"echo '{username} ALL=(ALL) NOPASSWD: /usr/bin/chvt' | sudo tee /etc/sudoers.d/kiosk-chvt")
+        run_command(
+            f"sudo adduser --disabled-password --gecos '' {username}",
+            log_callback=engine.log,
+        )
+        run_command(
+            f"echo '{username} ALL=(ALL) NOPASSWD: /usr/bin/chvt' | sudo tee /etc/sudoers.d/kiosk-chvt"
+        )
         engine.log(f"✓ Created user '{username}'")
 
     # --- Package Dependencies ---
     engine.log("")
     engine.log("→ Installing system dependencies...")
-    run_command("curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -", log_callback=engine.log)
-    run_command("sudo add-apt-repository -y ppa:mozillateam/ppa", log_callback=engine.log)
+    run_command(
+        "curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -",
+        log_callback=engine.log,
+    )
+    run_command(
+        "sudo add-apt-repository -y ppa:mozillateam/ppa", log_callback=engine.log
+    )
     run_command("sudo apt update", log_callback=engine.log)
 
     packages = [
-        "curl", "git", "python3-full", "python3-venv", "nodejs",
-        "fonts-symbola", "fonts-noto-core", "fonts-dejavu", "fonts-wqy-microhei",
-        "kmscon", "sway", "firefox-esr", "wlr-randr", "seatd", "swaybg", "ufw", "neofetch"
+        "curl",
+        "git",
+        "python3-full",
+        "python3-venv",
+        "nodejs",
+        "fonts-symbola",
+        "fonts-noto-core",
+        "fonts-dejavu",
+        "fonts-wqy-microhei",
+        "kmscon",
+        "sway",
+        "firefox-esr",
+        "wlr-randr",
+        "seatd",
+        "swaybg",
+        "ufw",
+        "neofetch",
     ]
     package_list = " ".join(packages)
     engine.log(f" Installing dependencies... (This may take a while!)")
@@ -194,15 +233,15 @@ def main(stdscr):
     run_command("sudo groupadd -r seat 2>/dev/null || true", log_callback=engine.log)
     run_command(
         f"sudo usermod -aG video,audio,input,tty,render,sudo,seat {username}",
-        log_callback=engine.log
+        log_callback=engine.log,
     )
     engine.log(f"✓ Added user to required groups")
 
     # --- Fastfetch ---
-    #engine.log("→ Installing fastfetch...")
-    #run_command("wget https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-amd64.deb -O /tmp/fastfetch.deb", log_callback=engine.log)
-    #run_command("sudo dpkg -i /tmp/fastfetch.deb", log_callback=engine.log)
-    #engine.log("✓ Fastfetch installed")
+    # engine.log("→ Installing fastfetch...")
+    # run_command("wget https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-amd64.deb -O /tmp/fastfetch.deb", log_callback=engine.log)
+    # run_command("sudo dpkg -i /tmp/fastfetch.deb", log_callback=engine.log)
+    # engine.log("✓ Fastfetch installed")
 
     # Firefox policies
     firefox_policies = """{
@@ -225,7 +264,7 @@ def main(stdscr):
         engine.log(" Cloning repository...")
         run_command(
             f"sudo -u {username} git clone https://github.com/rawnullbyte/EduBoard.git {repo_dir}",
-            log_callback=engine.log
+            log_callback=engine.log,
         )
         engine.log("✓ Repository cloned")
     else:
@@ -243,7 +282,11 @@ WAYLAND_DISPLAY=wayland-0
     engine.log(" Creating Python virtual environment...")
     run_command(f"python3 -m venv {venv_dir}", user=username, log_callback=engine.log)
     run_command(f"sudo chown -R {username}:{username} {venv_dir}")
-    run_command(f"{venv_dir}/bin/pip install -r {repo_dir}/requirements.txt", user=username, log_callback=engine.log)
+    run_command(
+        f"{venv_dir}/bin/pip install -r {repo_dir}/requirements.txt",
+        user=username,
+        log_callback=engine.log,
+    )
 
     # --- Systemd Service ---
     engine.log("")
@@ -315,10 +358,12 @@ ExecStart=/usr/libexec/kmscon/kmscon --vt tty1 --seats seat0 --configdir /etc/km
     run_command("sudo ufw default deny incoming", log_callback=engine.log)
     run_command("sudo ufw default allow outgoing", log_callback=engine.log)
     run_command("sudo ufw allow 22/tcp comment 'SSH'", log_callback=engine.log)
-    
+
     if tailscale_installed:
-        run_command("sudo ufw allow 41641/udp comment 'Tailscale'", log_callback=engine.log)
-    
+        run_command(
+            "sudo ufw allow 41641/udp comment 'Tailscale'", log_callback=engine.log
+        )
+
     run_command("echo 'y' | sudo ufw enable", log_callback=engine.log)
     run_command("sudo ufw reload", log_callback=engine.log)
     engine.log("✓ UFW firewall configured and enabled")
