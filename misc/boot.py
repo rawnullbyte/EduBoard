@@ -24,8 +24,12 @@ def main(stdscr, debug=False):
 
         if debug:
             try:
+                # result = subprocess.run(
+                #     ["fastfetch", "--logo", "none", "--structure-disabled", "colors"],
+                #     capture_output=True, text=True
+                # )
                 result = subprocess.run(
-                    ["fastfetch", "--logo", "none", "--structure-disabled", "colors"],
+                    ["neofetch", "--off", "--color_blocks", "off"],
                     capture_output=True, text=True
                 )
                 for line in result.stdout.splitlines():
