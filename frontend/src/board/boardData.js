@@ -136,7 +136,30 @@ function buildLessonEntry(item, lookup, period) {
   }
 }
 
-function buildLessonCell(items, lookup, period) {
+function timeToMinutes(time) {
+  if (!time) return 0
+  const [h, m] = time.split(':').map(Number)
+  return h * 60 + m
+}
+
+function calculatePeriodSpan(item, periods) {
+  if (!item.starttime || !item.endtime) return { span: 1, periodIndex: 0 }
+  const itemStart = timeToMinutes(item.starttime)
+  const itemEnd = timeToMinutes(item.endtime)
+  let span = 0
+  let firstIndex = -1
+  for (let i = 0; i < periods.length; i++) {
+    const pStart = timeToMinutes(periods[i].start)
+    const pEnd = timeToMinutes(periods[i].end)
+    if (itemStart < pEnd && itemEnd > pStart) {
+      span++
+      if (firstIndex === -1) firstIndex = i
+    }
+  }
+  return { span: Math.max(span, 1), periodIndex: firstIndex >= 0 ? firstIndex : 0 }
+}
+
+function buildLessonCell(items, lookup, period, periods) {
   if (!items.length) return null
 
   const cards = items.filter((item) => item.type === 'card')
@@ -153,12 +176,14 @@ function buildLessonCell(items, lookup, period) {
       entries: [],
       note: '',
       tone: 'empty',
+      span: 1,
     }
   }
 
   const splitCards = activeCards.filter((item) => getGroupLabel(item))
   const splitLayout = splitCards.length >= 2
   const sourceItems = showEventAsPrimary ? events : activeCards
+  const spanInfo = calculatePeriodSpan(sourceItems[0] ?? {}, periods)
 
   return {
     layout: splitLayout ? 'split' : 'stack',
@@ -167,6 +192,7 @@ function buildLessonCell(items, lookup, period) {
       : sourceItems.slice(0, 2).map((item) => buildLessonEntry(item, lookup, period)),
     note: '',
     tone: showEventAsPrimary ? 'event' : changed ? 'changed' : 'default',
+    span: spanInfo.span,
   }
 }
 
@@ -192,7 +218,7 @@ export function collectTimetableRows(timetable, lookup, periods) {
       const cells = Object.fromEntries(
         periods.map((period) => {
           const periodKey = String(period.period)
-          return [periodKey, buildLessonCell(byPeriod.get(periodKey) ?? [], lookup, period)]
+          return [periodKey, buildLessonCell(byPeriod.get(periodKey) ?? [], lookup, period, periods)]
         }),
       )
 

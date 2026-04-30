@@ -14,7 +14,7 @@ export default function TimetablePage({ rows, periods }) {
         height: '100%',
         display: 'grid',
         gridTemplateColumns: `minmax(140px, 11vw) repeat(${periods.length}, minmax(0, 1fr))`,
-        gridTemplateRows: `minmax(85px, 9.5vh) repeat(${CLASSES_PER_PAGE}, minmax(0, 1fr))`,
+        gridTemplateRows: `minmax(85px, 9.5vh) repeat(${CLASSES_PER_PAGE}, minmax(clamp(70px, 11vh, 180px), 1fr))`,
         gap: '0.45rem',
       }}
     >
@@ -51,45 +51,70 @@ export default function TimetablePage({ rows, periods }) {
         </md-filled-tonal-card>
       ))}
 
-      {paddedRows.map((row, rowIndex) => (
-        <Fragment key={row?.id ?? `empty-row-${rowIndex}`}>
-          <md-outlined-card
-            style={{
-              borderRadius: '12px',
-              display: 'grid',
-              placeItems: 'center',
-              borderColor: row
-                ? 'color-mix(in srgb, var(--md-sys-color-outline) 20%, transparent)'
-                : 'color-mix(in srgb, var(--md-sys-color-outline) 26%, transparent)',
-              borderStyle: 'solid',
-              borderWidth: row ? '1px' : '1px',
-              background: row
-                ? 'var(--md-sys-color-surface-container-high)'
-                : 'color-mix(in srgb, var(--md-sys-color-surface-container-high) 76%, transparent)',
-              padding: '0.45rem',
-            }}
-          >
-            <span
+      {paddedRows.map((row, rowIndex) => {
+        const rowCells = periods.map((period, periodIndex) => {
+          const cell = row?.cells?.[String(period.period)] ?? null
+          return { cell, period, periodIndex, consumed: false }
+        })
+
+        for (let i = 0; i < rowCells.length; i++) {
+          const span = rowCells[i].cell?.span ?? 0
+          if (span > 1) {
+            for (let j = 1; j < span && i + j < rowCells.length; j++) {
+              rowCells[i + j].consumed = true
+            }
+          }
+        }
+
+        return (
+          <Fragment key={row?.id ?? `empty-row-${rowIndex}`}>
+            <md-outlined-card
               style={{
-                fontSize: 'clamp(1.7rem, 2.35vw, 3.25rem)',
-                fontWeight: 700,
-                letterSpacing: '-0.03em',
-                color: row ? 'var(--md-sys-color-on-surface)' : 'var(--md-sys-color-on-surface-variant)',
-                textAlign: 'center',
+                borderRadius: '12px',
+                display: 'grid',
+                placeItems: 'center',
+                borderColor: row
+                  ? 'color-mix(in srgb, var(--md-sys-color-outline) 20%, transparent)'
+                  : 'color-mix(in srgb, var(--md-sys-color-outline) 26%, transparent)',
+                borderStyle: 'solid',
+                borderWidth: row ? '1px' : '1px',
+                background: row
+                  ? 'var(--md-sys-color-surface-container-high)'
+                  : 'color-mix(in srgb, var(--md-sys-color-surface-container-high) 76%, transparent)',
+                padding: '0.45rem',
               }}
             >
-              {row?.name ?? '—'}
-            </span>
-          </md-outlined-card>
+              <span
+                style={{
+                  fontSize: 'clamp(1.7rem, 2.35vw, 3.25rem)',
+                  fontWeight: 700,
+                  letterSpacing: '-0.03em',
+                  color: row ? 'var(--md-sys-color-on-surface)' : 'var(--md-sys-color-on-surface-variant)',
+                  textAlign: 'center',
+                }}
+              >
+                {row?.name ?? '—'}
+              </span>
+            </md-outlined-card>
 
-          {periods.map((period) => (
-            <LessonCard
-              key={`${row?.id ?? `empty-${rowIndex}`}-${period.period}`}
-              cell={row?.cells?.[String(period.period)] ?? null}
-            />
-          ))}
-        </Fragment>
-      ))}
+            {rowCells.map(({ cell, periodIndex, consumed }) => {
+              if (consumed) return null
+              const span = cell?.span ?? 1
+              return (
+                <div
+                  key={`${row?.id ?? `empty-${rowIndex}`}-${periodIndex}`}
+                  style={{
+                    gridColumn: span > 1 ? `span ${span}` : undefined,
+                    minWidth: 0,
+                  }}
+                >
+                  <LessonCard cell={cell} />
+                </div>
+              )
+            })}
+          </Fragment>
+        )
+      })}
     </section>
   )
 }
