@@ -1,8 +1,28 @@
 import { Fragment } from 'react'
 import { CLASSES_PER_PAGE } from '../constants'
+import { useBoardClock } from '../hooks/useBoardClock'
 import LessonCard from './LessonCard'
 
+function timeToMinutes(time) {
+  if (!time) return 0
+  const [h, m] = time.split(':').map(Number)
+  return h * 60 + m
+}
+
+function getActivePeriodIndex(periods) {
+  const now = new Date()
+  const minutes = now.getHours() * 60 + now.getMinutes()
+  for (let i = 0; i < periods.length; i++) {
+    const start = timeToMinutes(periods[i].start)
+    const end = timeToMinutes(periods[i].end)
+    if (minutes >= start && minutes < end) return i
+  }
+  return -1
+}
+
 export default function TimetablePage({ rows, periods }) {
+  const clock = useBoardClock()
+  const activePeriod = getActivePeriodIndex(periods)
   const paddedRows = [...rows]
 
   while (paddedRows.length < CLASSES_PER_PAGE) paddedRows.push(null)
@@ -30,14 +50,16 @@ export default function TimetablePage({ rows, periods }) {
         <span style={{ color: 'var(--md-sys-color-on-surface-variant)', fontWeight: 600, fontSize: '0.78rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Třída</span>
       </md-filled-tonal-card>
 
-      {periods.map((period) => (
+      {periods.map((period, pIdx) => (
         <md-outlined-card
           key={period.period}
           style={{
             borderRadius: '12px',
-            borderColor: 'color-mix(in srgb, var(--md-sys-color-outline) 20%, transparent)',
+            borderColor: pIdx === activePeriod
+              ? 'var(--md-sys-color-primary)'
+              : 'color-mix(in srgb, var(--md-sys-color-outline) 20%, transparent)',
             borderStyle: 'solid',
-            borderWidth: '1px',
+            borderWidth: pIdx === activePeriod ? '2px' : '1px',
             padding: '0',
           }}
         >
@@ -110,6 +132,7 @@ export default function TimetablePage({ rows, periods }) {
             {rowCells.map(({ cell, periodIndex, consumed }) => {
               if (consumed) return null
               const span = cell?.span ?? 1
+              const isActiveCol = periodIndex === activePeriod
               return (
                 <md-outlined-card
                   key={`${row?.id ?? `empty-${rowIndex}`}-${periodIndex}`}
@@ -117,11 +140,13 @@ export default function TimetablePage({ rows, periods }) {
                     gridColumn: span > 1 ? `span ${span}` : undefined,
                     minWidth: 0,
                     borderRadius: '12px',
-                    borderColor: cell && cell.layout !== 'blank'
-                      ? 'color-mix(in srgb, var(--md-sys-color-outline) 20%, transparent)'
-                      : 'color-mix(in srgb, var(--md-sys-color-outline) 28%, transparent)',
+                    borderColor: isActiveCol && cell && cell.layout !== 'blank'
+                      ? 'var(--md-sys-color-primary)'
+                      : cell && cell.layout !== 'blank'
+                        ? 'color-mix(in srgb, var(--md-sys-color-outline) 20%, transparent)'
+                        : 'color-mix(in srgb, var(--md-sys-color-outline) 12%, transparent)',
                     borderStyle: 'solid',
-                    borderWidth: '1px',
+                    borderWidth: isActiveCol && cell && cell.layout !== 'blank' ? '2px' : '1px',
                     overflow: 'hidden',
                   }}
                 >
