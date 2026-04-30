@@ -244,16 +244,18 @@ class ScreenManager:
         import glob
         import shutil
 
-        runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
         env = os.environ.copy()
-        env["XDG_RUNTIME_DIR"] = runtime_dir
         try:
-            sockets = sorted(glob.glob(os.path.join(runtime_dir, "wayland-*")))
-            if sockets:
-                env["WAYLAND_DISPLAY"] = os.path.basename(sockets[0])
-            print(
-                f"DEBUG: runtime_dir={runtime_dir}, WAYLAND_DISPLAY={env.get('WAYLAND_DISPLAY')}, swaylock_path={shutil.which('swaylock')}"
-            )
+            for user_dir in sorted(glob.glob("/run/user/*/")):
+                sockets = sorted(glob.glob(os.path.join(user_dir, "wayland-[0-9]*")))
+                non_lock = [s for s in sockets if not s.endswith(".lock")]
+                if non_lock:
+                    env["XDG_RUNTIME_DIR"] = user_dir.rstrip("/")
+                    env["WAYLAND_DISPLAY"] = os.path.basename(non_lock[0])
+                    print(
+                        f"DEBUG: Found socket at {env['XDG_RUNTIME_DIR']}/{env['WAYLAND_DISPLAY']}, swaylock_path={shutil.which('swaylock')}"
+                    )
+                    return env
         except Exception as e:
             print(f"DEBUG: Error finding socket: {e}")
         return env
