@@ -111,15 +111,22 @@ export default function TimetablePage({ rows, periods }) {
               if (consumed) return null
               const span = cell?.span ?? 1
               return (
-                <div
+                <md-outlined-card
                   key={`${row?.id ?? `empty-${rowIndex}`}-${periodIndex}`}
                   style={{
                     gridColumn: span > 1 ? `span ${span}` : undefined,
                     minWidth: 0,
+                    borderRadius: '12px',
+                    borderColor: cell && cell.layout !== 'blank'
+                      ? 'color-mix(in srgb, var(--md-sys-color-outline) 20%, transparent)'
+                      : 'color-mix(in srgb, var(--md-sys-color-outline) 28%, transparent)',
+                    borderStyle: 'solid',
+                    borderWidth: '1px',
+                    overflow: 'hidden',
                   }}
                 >
                   <LessonCard cell={cell} />
-                </div>
+                </md-outlined-card>
               )
             })}
           </Fragment>
