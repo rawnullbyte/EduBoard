@@ -4,7 +4,7 @@ function toneStyle(tone) {
       borderColor: 'rgba(34, 197, 94, 0.85)',
       background: 'rgba(22, 163, 74, 0.1)',
       badgeBg: 'rgba(22, 163, 74, 0.22)',
-      badgeColor: '#baf7cf',
+      badgeColor: 'var(--md-sys-color-badge-success)',
       rail: '#2cd67b',
     }
   }
@@ -13,7 +13,7 @@ function toneStyle(tone) {
       borderColor: 'rgba(251, 191, 36, 0.88)',
       background: 'rgba(245, 158, 11, 0.12)',
       badgeBg: 'rgba(245, 158, 11, 0.24)',
-      badgeColor: '#ffe1a6',
+      badgeColor: 'var(--md-sys-color-badge-warning)',
       rail: '#ffb020',
     }
   }
@@ -143,7 +143,7 @@ export default function LessonCard({ cell }) {
               style={{
                 minHeight: 0,
                 overflow: 'hidden',
-                borderTop: index > 0 ? '1px solid rgba(135, 147, 168, 0.25)' : 'none',
+                borderTop: index > 0 ? '1px solid color-mix(in srgb, var(--md-sys-color-outline) 25%, transparent)' : 'none',
                 paddingTop: index > 0 ? (compactSplit ? '0.16rem' : '0.35rem') : 0,
               }}
             >

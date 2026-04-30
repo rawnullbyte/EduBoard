@@ -16,6 +16,8 @@ const DARK_TOKENS = {
   '--md-sys-color-outline': '#8d919a',
   '--md-sys-color-error': '#ffb4ab',
   '--md-sys-color-on-error': '#690005',
+  '--md-sys-color-badge-success': '#baf7cf',
+  '--md-sys-color-badge-warning': '#ffe1a6',
 }
 
 const LIGHT_TOKENS = {
@@ -27,7 +29,7 @@ const LIGHT_TOKENS = {
   '--md-sys-color-on-secondary': '#ffffff',
   '--md-sys-color-tertiary': '#6b5778',
   '--md-sys-color-on-tertiary': '#ffffff',
-  '--md-sys-color-surface': '#131416',
+  '--md-sys-color-surface': '#f8f9ff',
   '--md-sys-color-surface-container': '#e1e2ec',
   '--md-sys-color-surface-container-high': '#d1d3d9',
   '--md-sys-color-surface-container-highest': '#c4c6cf',
@@ -36,6 +38,8 @@ const LIGHT_TOKENS = {
   '--md-sys-color-outline': '#73777f',
   '--md-sys-color-error': '#ba1a1a',
   '--md-sys-color-on-error': '#ffffff',
+  '--md-sys-color-badge-success': '#baf7cf',
+  '--md-sys-color-badge-warning': '#ffe1a6',
 }
 
 const SHARED_TOKENS = {
