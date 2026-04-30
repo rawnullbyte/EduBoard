@@ -268,10 +268,24 @@ class ScreenManager:
                     self._swaylock_proc.terminate()
                     self._swaylock_proc.wait()
                     self._swaylock_proc = None
+                subprocess.run(
+                    ["swaymsg", "output", "*", "power", "on"],
+                    check=True,
+                    env=env,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
                 print("Screen shown!")
             else:
                 if self._swaylock_proc and self._swaylock_proc.poll() is None:
                     return
+                subprocess.run(
+                    ["swaymsg", "output", "*", "power", "on"],
+                    check=True,
+                    env=env,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
                 self._swaylock_proc = subprocess.Popen(
                     ["swaylock", "-c", "000000", "-e", "-n"], env=env
                 )
