@@ -238,6 +238,7 @@ class EduBoard:
 class ScreenManager:
     def __init__(self, edub_instance):
         self.edub = edub_instance
+        self._swaylock_proc = None
 
     def set_screen(self, state: bool):
         try:
@@ -246,11 +247,19 @@ class ScreenManager:
             env["XDG_RUNTIME_DIR"] = os.getenv(
                 "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
             )
-            flag = "on" if state else "off"
-            subprocess.run(
-                ["swaymsg", "output", "*", "power", flag], check=True, env=env
-            )
-            print(f"Screen turned {flag}!")
+            if state:
+                if self._swaylock_proc and self._swaylock_proc.poll() is None:
+                    self._swaylock_proc.terminate()
+                    self._swaylock_proc.wait()
+                    self._swaylock_proc = None
+                print("Screen shown!")
+            else:
+                if self._swaylock_proc and self._swaylock_proc.poll() is None:
+                    return
+                self._swaylock_proc = subprocess.Popen(
+                    ["swaylock", "-c", "000000", "-e", "-n"], env=env
+                )
+                print("Screen locked!")
         except Exception as e:
             print(f"Error controlling screen: {e}")
 

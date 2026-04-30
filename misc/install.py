@@ -228,6 +228,7 @@ def main(stdscr):
         "wlr-randr",
         "seatd",
         "swaybg",
+        "swaylock",
         "ufw",
         "neofetch",
     ]
