@@ -270,7 +270,6 @@ class ScreenManager:
                     self._swaylock_proc = None
                 subprocess.run(
                     ["swaymsg", "output", "*", "power", "on"],
-                    check=True,
                     env=env,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
@@ -281,7 +280,6 @@ class ScreenManager:
                     return
                 subprocess.run(
                     ["swaymsg", "output", "*", "power", "on"],
-                    check=True,
                     env=env,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
