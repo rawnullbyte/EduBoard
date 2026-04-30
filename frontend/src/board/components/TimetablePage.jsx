@@ -31,13 +31,14 @@ export default function TimetablePage({ rows, periods }) {
       </md-filled-tonal-card>
 
       {periods.map((period) => (
-        <div
+        <md-outlined-card
           key={period.period}
           style={{
             borderRadius: '12px',
-            border: '1px solid color-mix(in srgb, var(--md-sys-color-outline) 20%, transparent)',
+            borderColor: 'color-mix(in srgb, var(--md-sys-color-outline) 20%, transparent)',
             borderStyle: 'solid',
-            overflow: 'hidden',
+            borderWidth: '1px',
+            padding: '0',
           }}
         >
           <md-filled-tonal-card
@@ -57,7 +58,7 @@ export default function TimetablePage({ rows, periods }) {
               {period.end}
             </div>
           </md-filled-tonal-card>
-        </div>
+        </md-outlined-card>
       ))}
 
       {paddedRows.map((row, rowIndex) => {
