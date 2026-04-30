@@ -240,13 +240,27 @@ class ScreenManager:
         self.edub = edub_instance
         self._swaylock_proc = None
 
+    def _get_wayland_env(self):
+        env = os.environ.copy()
+        runtime_dir = env.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+        env["XDG_RUNTIME_DIR"] = runtime_dir
+        current_display = env.get("WAYLAND_DISPLAY")
+        if not current_display or not os.path.exists(
+            os.path.join(runtime_dir, current_display)
+        ):
+            try:
+                sockets = [
+                    f for f in os.listdir(runtime_dir) if f.startswith("wayland-")
+                ]
+                if sockets:
+                    env["WAYLAND_DISPLAY"] = sockets[0]
+            except Exception:
+                pass
+        return env
+
     def set_screen(self, state: bool):
         try:
-            env = os.environ.copy()
-            env["WAYLAND_DISPLAY"] = os.getenv("WAYLAND_DISPLAY", "wayland-0")
-            env["XDG_RUNTIME_DIR"] = os.getenv(
-                "XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"
-            )
+            env = self._get_wayland_env()
             if state:
                 if self._swaylock_proc and self._swaylock_proc.poll() is None:
                     self._swaylock_proc.terminate()
