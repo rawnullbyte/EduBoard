@@ -31,24 +31,33 @@ export default function TimetablePage({ rows, periods }) {
       </md-filled-tonal-card>
 
       {periods.map((period) => (
-        <md-filled-tonal-card
+        <div
           key={period.period}
           style={{
-            borderRadius: 'var(--board-shape-medium)',
-            display: 'grid',
-            placeItems: 'center',
-            padding: '0.3rem',
-            background: 'var(--md-sys-color-surface-container-high)',
-            '--md-filled-tonal-card-container-color': 'var(--md-sys-color-surface-container-high)',
+            borderRadius: '12px',
+            border: '1px solid color-mix(in srgb, var(--md-sys-color-outline) 20%, transparent)',
+            borderStyle: 'solid',
+            overflow: 'hidden',
           }}
         >
-          <div style={{ fontSize: 'clamp(1.65rem, 2vw, 2.2rem)', lineHeight: 1, fontWeight: 700, color: 'var(--md-sys-color-primary)' }}>{period.short}</div>
-          <div style={{ marginTop: '0.22rem', textAlign: 'center', color: 'var(--md-sys-color-on-surface-variant)', fontSize: 'clamp(0.74rem, 0.86vw, 0.96rem)', fontWeight: 500 }}>
-            {period.start}
-            <br />
-            {period.end}
-          </div>
-        </md-filled-tonal-card>
+          <md-filled-tonal-card
+            style={{
+              borderRadius: 'var(--board-shape-medium)',
+              display: 'grid',
+              placeItems: 'center',
+              padding: '0.3rem',
+              background: 'var(--md-sys-color-surface-container-high)',
+              '--md-filled-tonal-card-container-color': 'var(--md-sys-color-surface-container-high)',
+            }}
+          >
+            <div style={{ fontSize: 'clamp(1.65rem, 2vw, 2.2rem)', lineHeight: 1, fontWeight: 700, color: 'var(--md-sys-color-primary)' }}>{period.short}</div>
+            <div style={{ marginTop: '0.22rem', textAlign: 'center', color: 'var(--md-sys-color-on-surface-variant)', fontSize: 'clamp(0.74rem, 0.86vw, 0.96rem)', fontWeight: 500 }}>
+              {period.start}
+              <br />
+              {period.end}
+            </div>
+          </md-filled-tonal-card>
+        </div>
       ))}
 
       {paddedRows.map((row, rowIndex) => {
