@@ -87,5 +87,6 @@ export function useBoardData() {
     hasBoardData: Boolean(payload?.lookup && payload?.timetable),
     pages,
     periods,
+    timetable: payload?.timetable,
   }
 }

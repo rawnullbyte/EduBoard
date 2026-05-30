@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { getPageTitle } from './board/boardData'
 import AccentRail from './board/components/AccentRail'
 import EmptyPage from './board/components/EmptyPage'
@@ -10,14 +11,53 @@ import { useBoardData } from './board/hooks/useBoardData'
 import { usePageRotation } from './board/hooks/usePageRotation'
 
 export default function App() {
-  const { loading, hasBoardData, pages, periods } = useBoardData()
+  const { loading, hasBoardData, pages, periods, timetable } = useBoardData()
   const { activePage, progress } = usePageRotation(pages)
-  const { clockLabel, dateParts } = useBoardClock()
+  const { now, clockLabel, dateParts } = useBoardClock()
   const pageTitle = getPageTitle(activePage)
   const activePageKey = activePage?.id ?? 'empty'
 
+  const showOverlay = useMemo(() => {
+    if (loading && !hasBoardData) return false
+    if (!timetable || !timetable.classes) return false
+
+    const allItems = timetable.classes.flatMap((cls) => cls.ttitems || [])
+    if (allItems.length === 0) return true
+
+    const h = now.getHours().toString().padStart(2, '0')
+    const m = now.getMinutes().toString().padStart(2, '0')
+    const nowStr = `${h}:${m}`
+
+    const isInClass = allItems.some((item) => item.starttime <= nowStr && nowStr < item.endtime)
+
+    const startTimes = allItems.map((item) => item.starttime).filter(Boolean)
+    const endTimes = allItems.map((item) => item.endtime).filter(Boolean)
+
+    if (startTimes.length === 0 || endTimes.length === 0) return true
+
+    const schoolStart = startTimes.reduce((a, b) => (a < b ? a : b))
+    const schoolEnd = endTimes.reduce((a, b) => (a > b ? a : b))
+
+    const isSchoolTime = nowStr >= schoolStart && nowStr < schoolEnd
+
+    return !(isSchoolTime && !isInClass)
+  }, [timetable, now, loading, hasBoardData])
+
   return (
     <div className="board-shell">
+      {showOverlay && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'black',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        />
+      )}
       <div className="board-surface">
         <TopBar pageTitle={pageTitle} clockLabel={clockLabel} dateParts={dateParts} />
       </div>

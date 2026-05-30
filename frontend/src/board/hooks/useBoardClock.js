@@ -16,6 +16,7 @@ export function useBoardClock() {
   const dateParts = useMemo(() => formatDateParts(now), [now])
 
   return {
+    now,
     clockLabel: formatClock(now),
     dateParts,
   }

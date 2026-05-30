@@ -235,107 +235,14 @@ class EduBoard:
         return data
 
 
-class ScreenManager:
-    def __init__(self, edub_instance):
-        self.edub = edub_instance
-        self._swaylock_proc = None
-
-    def _get_wayland_env(self):
-        import glob
-        import shutil
-
-        env = os.environ.copy()
-        try:
-            for user_dir in sorted(glob.glob("/run/user/*/")):
-                sockets = sorted(glob.glob(os.path.join(user_dir, "wayland-[0-9]*")))
-                non_lock = [s for s in sockets if not s.endswith(".lock")]
-                if non_lock:
-                    env["XDG_RUNTIME_DIR"] = user_dir.rstrip("/")
-                    env["WAYLAND_DISPLAY"] = os.path.basename(non_lock[0])
-                    print(
-                        f"DEBUG: Found socket at {env['XDG_RUNTIME_DIR']}/{env['WAYLAND_DISPLAY']}, swaylock_path={shutil.which('swaylock')}"
-                    )
-                    return env
-        except Exception as e:
-            print(f"DEBUG: Error finding socket: {e}")
-        return env
-
-    def set_screen(self, state: bool):
-        try:
-            env = self._get_wayland_env()
-            if state:
-                if self._swaylock_proc and self._swaylock_proc.poll() is None:
-                    self._swaylock_proc.terminate()
-                    self._swaylock_proc.wait()
-                    self._swaylock_proc = None
-                subprocess.run(
-                    ["swaymsg", "output", "*", "power", "on"],
-                    env=env,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-                print("Screen shown!")
-            else:
-                if self._swaylock_proc and self._swaylock_proc.poll() is None:
-                    return
-                subprocess.run(
-                    ["swaymsg", "output", "*", "power", "on"],
-                    env=env,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-                self._swaylock_proc = subprocess.Popen(
-                    ["swaylock", "-c", "000000", "-e", "-n"], env=env
-                )
-                print("Screen locked!")
-        except Exception as e:
-            print(f"Error controlling screen: {e}")
-
-    async def screen_timer_loop(self):
-        self.set_screen(True)
-        await asyncio.sleep(60)
-        while True:
-            try:
-                tt_data = self.edub.fetchTimetableData()
-                all_items = []
-                for cls in tt_data.get("classes", []):
-                    all_items.extend(cls.get("ttitems", []))
-                if not all_items:
-                    self.set_screen(False)
-                else:
-                    now_str = datetime.now().strftime("%H:%M")
-                    is_in_class = any(
-                        item["starttime"] <= now_str < item["endtime"]
-                        for item in all_items
-                    )
-                    school_start = min(item["starttime"] for item in all_items)
-                    school_end = max(item["endtime"] for item in all_items)
-                    self.set_screen(
-                        (school_start <= now_str < school_end) and not is_in_class
-                    )
-            except Exception as e:
-                print(f"Timer Loop Error: {e}")
-            await asyncio.sleep(60)
-
-
 # Class instances
 edub = EduBoard()
-screenmgr = ScreenManager(edub)
 
 
-# Screen manager
+# Lifespan
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(screenmgr.screen_timer_loop())
-    print("Screen manager background task started.")
-
     yield
-
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        print("Screen manager background task stopped.")
 
 
 # Initialize FastAPI
