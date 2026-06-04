@@ -1,6 +1,5 @@
 import { Fragment } from 'react'
 import { CLASSES_PER_PAGE } from '../constants'
-import { useBoardClock } from '../hooks/useBoardClock'
 import LessonCard from './LessonCard'
 
 function timeToMinutes(time) {
@@ -21,7 +20,6 @@ function getActivePeriodIndex(periods) {
 }
 
 export default function TimetablePage({ rows, periods }) {
-  const clock = useBoardClock()
   const activePeriod = getActivePeriodIndex(periods)
   const paddedRows = [...rows]
 

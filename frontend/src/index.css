@@ -157,3 +157,31 @@ body {
     inset-inline-start: -40%;
   }
 }
+
+/* --- Board overlay (screen off) --- */
+.board-overlay {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  transition: opacity 800ms ease;
+}
+.board-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.board-overlay-indicator {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  animation: overlay-breath 4s ease-in-out infinite;
+}
+@keyframes overlay-breath {
+  0%, 100% { opacity: 0.02; transform: scale(1); }
+  50% { opacity: 0.06; transform: scale(1.05); }
+}
